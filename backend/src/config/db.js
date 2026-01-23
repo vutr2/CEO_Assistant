@@ -6,7 +6,7 @@ const config = require('./env');
 
 const connectDB = async () => {
   try {
-    // Mock database connection for development
+    //Mock database connection for development
     console.log('✅ Using in-memory mock database');
     console.log(`📊 Environment: ${config.NODE_ENV}`);
     console.log('💡 To use MongoDB: install mongoose and update this file');
