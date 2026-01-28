@@ -1,142 +1,51 @@
-// Multi-tenant Notifications Service
-// Data is stored per company using companyId as key
+// Multi-tenant Notifications Service using MongoDB
 
-const dataByCompany = {};
-let notificationIdCounter = 1;
-
-// Initialize company data if not exists
-const initCompanyData = (companyId) => {
-  const key = companyId?.toString() || 'default';
-  if (!dataByCompany[key]) {
-    dataByCompany[key] = {
-      notifications: []
-    };
-    generateMockNotificationsForCompany(key);
-  }
-  return dataByCompany[key];
-};
-
-// Generate mock notifications for a company
-const generateMockNotificationsForCompany = (companyKey) => {
-  const data = dataByCompany[companyKey];
-
-  data.notifications = [
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Báo cáo tài chính Q4 đã hoàn thành',
-      message: 'Báo cáo tài chính quý 4 năm 2025 đã được tạo và sẵn sàng xem',
-      type: 'report',
-      read: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      iconName: 'FileText',
-      iconColor: 'blue'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Nhân viên mới đã được thêm',
-      message: 'Nguyễn Văn An đã được thêm vào phòng Công nghệ',
-      type: 'employee',
-      read: false,
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      iconName: 'UserPlus',
-      iconColor: 'green'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Thanh toán sắp đến hạn',
-      message: 'Tiền lương tháng 1 sẽ đến hạn trong 3 ngày',
-      type: 'payment',
-      read: false,
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'AlertCircle',
-      iconColor: 'orange'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Hiệu suất nhân viên đã được cập nhật',
-      message: 'Đánh giá hiệu suất Q4 cho tất cả nhân viên đã hoàn tất',
-      type: 'performance',
-      read: true,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'TrendingUp',
-      iconColor: 'purple'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Mục tiêu KPI đã đạt được',
-      message: 'Phòng Kinh doanh đã đạt 105% mục tiêu doanh thu tháng 12',
-      type: 'achievement',
-      read: true,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'Award',
-      iconColor: 'gold'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Yêu cầu nghỉ phép đang chờ',
-      message: 'Trần Thị Bình đã gửi yêu cầu nghỉ phép 3 ngày',
-      type: 'leave',
-      read: true,
-      createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'Calendar',
-      iconColor: 'blue'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Ngân sách đã được phê duyệt',
-      message: 'Ngân sách Q1 2026 cho phòng Marketing đã được phê duyệt',
-      type: 'budget',
-      read: true,
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'DollarSign',
-      iconColor: 'green'
-    },
-    {
-      id: notificationIdCounter++,
-      companyId: companyKey,
-      title: 'Cuộc họp sắp diễn ra',
-      message: 'Cuộc họp ban lãnh đạo sẽ bắt đầu vào lúc 14:00 hôm nay',
-      type: 'meeting',
-      read: true,
-      createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-      iconName: 'Users',
-      iconColor: 'purple'
-    }
-  ];
-};
+const Notification = require('../../models/Notification');
+const logger = require('../../utils/logger');
 
 const notificationsService = {
   /**
    * Get all notifications with pagination for a company
-   * @param {string} companyId - Company ID for multi-tenant filtering
    */
   getAllNotifications: async (companyId, { limit = 10, offset = 0, read } = {}) => {
-    const data = initCompanyData(companyId);
-    let notifications = [...data.notifications];
+    logger.info('Getting notifications', { companyId, limit, offset, read });
+
+    if (!companyId) {
+      return { data: [], total: 0, unreadCount: 0 };
+    }
+
+    const query = { companyId };
 
     // Filter by read status if specified
     if (read !== undefined) {
       const isRead = read === 'true' || read === true;
-      notifications = notifications.filter(n => n.read === isRead);
+      query.unread = !isRead;
     }
 
-    // Sort by date (newest first)
-    notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    // Apply pagination
-    const paginatedNotifications = notifications.slice(offset, offset + limit);
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit),
+      Notification.countDocuments(query),
+      Notification.countDocuments({ companyId, unread: true })
+    ]);
 
     return {
-      data: paginatedNotifications,
-      total: notifications.length,
-      unreadCount: data.notifications.filter(n => !n.read).length
+      data: notifications.map(n => ({
+        id: n._id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        category: n.category,
+        read: !n.unread,
+        priority: n.priority,
+        iconName: n.iconName,
+        iconColor: n.color,
+        createdAt: n.createdAt
+      })),
+      total,
+      unreadCount
     };
   },
 
@@ -144,32 +53,58 @@ const notificationsService = {
    * Get unread count for a company
    */
   getUnreadCount: async (companyId) => {
-    const data = initCompanyData(companyId);
-    const unreadCount = data.notifications.filter(n => !n.read).length;
-    return { count: unreadCount };
+    if (!companyId) {
+      return { count: 0 };
+    }
+
+    const count = await Notification.countDocuments({ companyId, unread: true });
+    return { count };
   },
 
   /**
    * Mark notification as read
    */
   markAsRead: async (companyId, notificationId) => {
-    const data = initCompanyData(companyId);
-    const notification = data.notifications.find(n => n.id === parseInt(notificationId));
-    if (notification) {
-      notification.read = true;
-      return notification;
+    logger.info('Marking notification as read', { companyId, notificationId });
+
+    const query = { _id: notificationId };
+    if (companyId) query.companyId = companyId;
+
+    const notification = await Notification.findOneAndUpdate(
+      query,
+      { $set: { unread: false, readAt: new Date() } },
+      { new: true }
+    );
+
+    if (!notification) {
+      return null;
     }
-    return null;
+
+    return {
+      id: notification._id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      read: !notification.unread,
+      createdAt: notification.createdAt
+    };
   },
 
   /**
    * Mark all notifications as read for a company
    */
   markAllAsRead: async (companyId) => {
-    const data = initCompanyData(companyId);
-    data.notifications.forEach(n => {
-      n.read = true;
-    });
+    logger.info('Marking all notifications as read', { companyId });
+
+    if (!companyId) {
+      return { success: false, message: 'Company ID required' };
+    }
+
+    await Notification.updateMany(
+      { companyId, unread: true },
+      { $set: { unread: false, readAt: new Date() } }
+    );
+
     return { success: true, message: 'Đã đánh dấu tất cả là đã đọc' };
   },
 
@@ -177,10 +112,14 @@ const notificationsService = {
    * Delete notification
    */
   deleteNotification: async (companyId, notificationId) => {
-    const data = initCompanyData(companyId);
-    const index = data.notifications.findIndex(n => n.id === parseInt(notificationId));
-    if (index !== -1) {
-      data.notifications.splice(index, 1);
+    logger.info('Deleting notification', { companyId, notificationId });
+
+    const query = { _id: notificationId };
+    if (companyId) query.companyId = companyId;
+
+    const result = await Notification.deleteOne(query);
+
+    if (result.deletedCount > 0) {
       return { success: true, message: 'Đã xóa thông báo' };
     }
     return null;
@@ -189,50 +128,75 @@ const notificationsService = {
   /**
    * Create notification for a company
    */
-  createNotification: async (companyId, notificationData) => {
-    const data = initCompanyData(companyId);
-    const newNotification = {
-      id: notificationIdCounter++,
+  createNotification: async (companyId, userId, notificationData) => {
+    logger.info('Creating notification', { companyId, userId });
+
+    if (!companyId || !userId) {
+      throw new Error('Company ID and User ID are required');
+    }
+
+    const notification = await Notification.create({
       companyId,
-      ...notificationData,
-      read: false,
-      createdAt: new Date().toISOString()
+      userId,
+      title: notificationData.title,
+      message: notificationData.message,
+      type: notificationData.type || 'system',
+      category: notificationData.category || 'general',
+      priority: notificationData.priority || 'medium',
+      iconName: notificationData.iconName || 'Bell',
+      color: notificationData.iconColor || 'blue',
+      relatedId: notificationData.relatedId,
+      relatedModel: notificationData.relatedModel
+    });
+
+    return {
+      id: notification._id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      read: !notification.unread,
+      createdAt: notification.createdAt
     };
-    data.notifications.unshift(newNotification);
-    return newNotification;
   },
 
   /**
    * Get notification categories with counts for a company
    */
   getCategories: async (companyId) => {
-    const data = initCompanyData(companyId);
-    const typeCounts = {};
-    data.notifications.forEach(n => {
-      typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
-    });
+    logger.info('Getting notification categories', { companyId });
+
+    if (!companyId) {
+      return [{ id: 'all', label: 'Tất cả', count: 0 }];
+    }
+
+    const [total, typeCounts] = await Promise.all([
+      Notification.countDocuments({ companyId }),
+      Notification.aggregate([
+        { $match: { companyId } },
+        { $group: { _id: '$type', count: { $sum: 1 } } }
+      ])
+    ]);
 
     const categoryLabels = {
       all: 'Tất cả',
       report: 'Báo cáo',
-      employee: 'Nhân sự',
+      task: 'Nhiệm vụ',
+      meeting: 'Cuộc họp',
       payment: 'Thanh toán',
-      performance: 'Hiệu suất',
-      achievement: 'Thành tích',
-      leave: 'Nghỉ phép',
-      budget: 'Ngân sách',
-      meeting: 'Cuộc họp'
+      alert: 'Cảnh báo',
+      system: 'Hệ thống',
+      announcement: 'Thông báo'
     };
 
     const categories = [
-      { id: 'all', label: categoryLabels.all, count: data.notifications.length }
+      { id: 'all', label: categoryLabels.all, count: total }
     ];
 
-    Object.keys(typeCounts).forEach(type => {
+    typeCounts.forEach(tc => {
       categories.push({
-        id: type,
-        label: categoryLabels[type] || type,
-        count: typeCounts[type]
+        id: tc._id,
+        label: categoryLabels[tc._id] || tc._id,
+        count: tc.count
       });
     });
 

@@ -8,7 +8,9 @@ const notificationsController = {
   getAllNotifications: async (req, res, next) => {
     try {
       const { limit = 10, offset = 0, read } = req.query;
-      const result = await notificationsService.getAllNotifications({
+      const companyId = req.user?.companyId;
+
+      const result = await notificationsService.getAllNotifications(companyId, {
         limit: parseInt(limit),
         offset: parseInt(offset),
         read
@@ -31,7 +33,8 @@ const notificationsController = {
    */
   getUnreadCount: async (req, res, next) => {
     try {
-      const result = await notificationsService.getUnreadCount();
+      const companyId = req.user?.companyId;
+      const result = await notificationsService.getUnreadCount(companyId);
       res.status(200).json({
         success: true,
         count: result.count
@@ -48,7 +51,8 @@ const notificationsController = {
   markAsRead: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const notification = await notificationsService.markAsRead(id);
+      const companyId = req.user?.companyId;
+      const notification = await notificationsService.markAsRead(companyId, id);
 
       if (!notification) {
         return res.status(404).json({
@@ -72,7 +76,8 @@ const notificationsController = {
    */
   markAllAsRead: async (req, res, next) => {
     try {
-      const result = await notificationsService.markAllAsRead();
+      const companyId = req.user?.companyId;
+      const result = await notificationsService.markAllAsRead(companyId);
       res.status(200).json({
         success: true,
         message: result.message
@@ -89,7 +94,8 @@ const notificationsController = {
   deleteNotification: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const result = await notificationsService.deleteNotification(id);
+      const companyId = req.user?.companyId;
+      const result = await notificationsService.deleteNotification(companyId, id);
 
       if (!result) {
         return res.status(404).json({
@@ -113,7 +119,8 @@ const notificationsController = {
    */
   getCategories: async (req, res, next) => {
     try {
-      const categories = await notificationsService.getCategories();
+      const companyId = req.user?.companyId;
+      const categories = await notificationsService.getCategories(companyId);
       res.status(200).json({
         success: true,
         data: categories

@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('./payment.controller');
-const { authenticate, optionalAuth } = require('../../middlewares/auth.middleware');
+const { authenticate } = require('../../middlewares/auth');
 
 // Public routes (no authentication required)
 router.get('/plans', paymentController.getPaymentPlans);

@@ -8,8 +8,9 @@ const reportsController = {
    */
   getAllReports: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { limit = 10, sort = '-createdAt' } = req.query;
-      const reports = await reportsService.getAllReports({ limit: parseInt(limit), sort });
+      const reports = await reportsService.getAllReports(companyId, { limit: parseInt(limit), sort });
 
       res.status(200).json({
         success: true,
@@ -30,8 +31,9 @@ const reportsController = {
    */
   getReportStats: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { period = 'month' } = req.query;
-      const stats = await reportsService.getReportStats(period);
+      const stats = await reportsService.getReportStats(companyId, period);
 
       res.status(200).json({
         success: true,
@@ -52,7 +54,8 @@ const reportsController = {
    */
   getReportTemplates: async (req, res) => {
     try {
-      const templates = await reportsService.getReportTemplates();
+      const companyId = req.companyId;
+      const templates = await reportsService.getReportTemplates(companyId);
 
       res.status(200).json({
         success: true,
@@ -73,7 +76,7 @@ const reportsController = {
    */
   getOverviewReport: async (req, res) => {
     try {
-      const companyId = req.user?.companyId;
+      const companyId = req.companyId;
       const report = await reportsService.getOverviewReport(companyId);
 
       res.status(200).json({
@@ -95,7 +98,7 @@ const reportsController = {
    */
   getDashboardReport: async (req, res) => {
     try {
-      const companyId = req.user?.companyId;
+      const companyId = req.companyId;
       const report = await reportsService.getDashboardReport(companyId);
 
       res.status(200).json({
@@ -126,7 +129,8 @@ const reportsController = {
         });
       }
 
-      const report = await reportsService.getFinancialSummary(startDate, endDate);
+      const companyId = req.companyId;
+      const report = await reportsService.getFinancialSummary(companyId, startDate, endDate);
 
       res.status(200).json({
         success: true,
@@ -156,7 +160,8 @@ const reportsController = {
         });
       }
 
-      const report = await reportsService.getDetailedFinancialReport(startDate, endDate);
+      const companyId = req.companyId;
+      const report = await reportsService.getDetailedFinancialReport(companyId, startDate, endDate);
 
       res.status(200).json({
         success: true,
@@ -186,7 +191,8 @@ const reportsController = {
         });
       }
 
-      const report = await reportsService.getProfitLossReport(startDate, endDate);
+      const companyId = req.companyId;
+      const report = await reportsService.getProfitLossReport(companyId, startDate, endDate);
 
       res.status(200).json({
         success: true,
@@ -207,7 +213,8 @@ const reportsController = {
    */
   getEmployeeSummary: async (req, res) => {
     try {
-      const report = await reportsService.getEmployeeSummary();
+      const companyId = req.companyId;
+      const report = await reportsService.getEmployeeSummary(companyId);
 
       res.status(200).json({
         success: true,
@@ -228,7 +235,8 @@ const reportsController = {
    */
   getEmployeePerformance: async (req, res) => {
     try {
-      const report = await reportsService.getEmployeePerformance();
+      const companyId = req.companyId;
+      const report = await reportsService.getEmployeePerformance(companyId);
 
       res.status(200).json({
         success: true,
@@ -258,7 +266,8 @@ const reportsController = {
         });
       }
 
-      const report = await reportsService.getAttendanceReport(startDate, endDate);
+      const companyId = req.companyId;
+      const report = await reportsService.getAttendanceReport(companyId, startDate, endDate);
 
       res.status(200).json({
         success: true,
@@ -288,11 +297,13 @@ const reportsController = {
         });
       }
 
-      const report = await reportsService.generateCustomReport({
+      const companyId = req.companyId;
+      const report = await reportsService.generateCustomReport(companyId, {
         name,
         type,
         parameters: parameters || {},
-        userId: req.userId
+        userId: req.user?.id,
+        authorName: req.user?.name
       });
 
       logger.info(`Custom report generated: ${report.id}`);
@@ -317,8 +328,9 @@ const reportsController = {
    */
   getCustomReport: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
-      const report = await reportsService.getCustomReport(id);
+      const report = await reportsService.getCustomReport(companyId, id);
 
       if (!report) {
         return res.status(404).json({
@@ -346,10 +358,11 @@ const reportsController = {
    */
   listCustomReports: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { type, startDate } = req.query;
-      const userId = req.userId;
+      const userId = req.user?.id;
 
-      const reports = await reportsService.listCustomReports(userId, {
+      const reports = await reportsService.listCustomReports(companyId, userId, {
         type,
         startDate
       });
@@ -392,7 +405,8 @@ const reportsController = {
         });
       }
 
-      const exportData = await reportsService.exportReport(reportType, reportData, format);
+      const companyId = req.companyId;
+      const exportData = await reportsService.exportReport(companyId, reportType, reportData, format);
 
       logger.info(`Report exported: ${reportType} in ${format} format`);
 

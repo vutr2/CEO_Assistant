@@ -8,8 +8,9 @@ const financeController = {
    */
   getFinancialOverview: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { period = 'month' } = req.query;
-      const overview = await financeService.getOverviewByPeriod(period);
+      const overview = await financeService.getOverviewByPeriod(companyId, period);
 
       res.status(200).json({
         success: true,
@@ -30,8 +31,9 @@ const financeController = {
    */
   getTransactions: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { limit = 10 } = req.query;
-      const transactions = await financeService.getRecentTransactions(parseInt(limit));
+      const transactions = await financeService.getRecentTransactions(companyId, parseInt(limit));
 
       res.status(200).json({
         success: true,
@@ -52,8 +54,9 @@ const financeController = {
    */
   getRevenue: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { startDate, endDate, source } = req.query;
-      const revenue = await financeService.getRevenue({ startDate, endDate, source });
+      const revenue = await financeService.getRevenue(companyId, { startDate, endDate, source });
 
       res.status(200).json({
         success: true,
@@ -85,7 +88,8 @@ const financeController = {
         });
       }
 
-      const revenue = await financeService.addRevenue({
+      const companyId = req.companyId;
+      const revenue = await financeService.addRevenue(companyId, {
         amount: parseFloat(amount),
         source,
         category,
@@ -115,8 +119,9 @@ const financeController = {
    */
   getRevenueById: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
-      const revenue = await financeService.getRevenueById(id);
+      const revenue = await financeService.getRevenueById(companyId, id);
 
       if (!revenue) {
         return res.status(404).json({
@@ -144,10 +149,11 @@ const financeController = {
    */
   updateRevenue: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
       const updateData = req.body;
 
-      const revenue = await financeService.updateRevenue(id, updateData);
+      const revenue = await financeService.updateRevenue(companyId, id, updateData);
 
       if (!revenue) {
         return res.status(404).json({
@@ -178,8 +184,9 @@ const financeController = {
    */
   deleteRevenue: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
-      const deleted = await financeService.deleteRevenue(id);
+      const deleted = await financeService.deleteRevenue(companyId, id);
 
       if (!deleted) {
         return res.status(404).json({
@@ -209,8 +216,9 @@ const financeController = {
    */
   getExpenses: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { startDate, endDate, category, status } = req.query;
-      const expenses = await financeService.getExpenses({ startDate, endDate, category, status });
+      const expenses = await financeService.getExpenses(companyId, { startDate, endDate, category, status });
 
       res.status(200).json({
         success: true,
@@ -242,7 +250,8 @@ const financeController = {
         });
       }
 
-      const expense = await financeService.addExpense({
+      const companyId = req.companyId;
+      const expense = await financeService.addExpense(companyId, {
         amount: parseFloat(amount),
         category,
         date,
@@ -273,8 +282,9 @@ const financeController = {
    */
   getExpenseById: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
-      const expense = await financeService.getExpenseById(id);
+      const expense = await financeService.getExpenseById(companyId, id);
 
       if (!expense) {
         return res.status(404).json({
@@ -302,10 +312,11 @@ const financeController = {
    */
   updateExpense: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
       const updateData = req.body;
 
-      const expense = await financeService.updateExpense(id, updateData);
+      const expense = await financeService.updateExpense(companyId, id, updateData);
 
       if (!expense) {
         return res.status(404).json({
@@ -336,8 +347,9 @@ const financeController = {
    */
   deleteExpense: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
-      const deleted = await financeService.deleteExpense(id);
+      const deleted = await financeService.deleteExpense(companyId, id);
 
       if (!deleted) {
         return res.status(404).json({
@@ -367,8 +379,9 @@ const financeController = {
    */
   getFinancialMetrics: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { period = 'monthly' } = req.query;
-      const metrics = await financeService.getFinancialMetrics(period);
+      const metrics = await financeService.getFinancialMetrics(companyId, period);
 
       res.status(200).json({
         success: true,
@@ -389,8 +402,9 @@ const financeController = {
    */
   getFinancialTrends: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { months = 12 } = req.query;
-      const trends = await financeService.getFinancialTrends(parseInt(months));
+      const trends = await financeService.getFinancialTrends(companyId, parseInt(months));
 
       res.status(200).json({
         success: true,
@@ -411,8 +425,9 @@ const financeController = {
    */
   getFinancialForecast: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { months = 6 } = req.query;
-      const forecast = await financeService.getFinancialForecast(parseInt(months));
+      const forecast = await financeService.getFinancialForecast(companyId, parseInt(months));
 
       res.status(200).json({
         success: true,
@@ -433,8 +448,9 @@ const financeController = {
    */
   getBudget: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { period = 'month' } = req.query;
-      const budget = await financeService.getBudgetByPeriod(period);
+      const budget = await financeService.getBudgetByPeriod(companyId, period);
 
       res.status(200).json({
         success: true,
@@ -465,7 +481,8 @@ const financeController = {
         });
       }
 
-      const budget = await financeService.createBudget({
+      const companyId = req.companyId;
+      const budget = await financeService.createBudget(companyId, {
         year: parseInt(year),
         totalBudget: parseFloat(totalBudget),
         categories
@@ -493,10 +510,11 @@ const financeController = {
    */
   updateBudget: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { id } = req.params;
       const updateData = req.body;
 
-      const budget = await financeService.updateBudget(id, updateData);
+      const budget = await financeService.updateBudget(companyId, id, updateData);
 
       if (!budget) {
         return res.status(404).json({
@@ -527,8 +545,9 @@ const financeController = {
    */
   getCashFlow: async (req, res) => {
     try {
+      const companyId = req.companyId;
       const { months = 12 } = req.query;
-      const cashFlow = await financeService.getCashFlow(parseInt(months));
+      const cashFlow = await financeService.getCashFlow(companyId, parseInt(months));
 
       res.status(200).json({
         success: true,

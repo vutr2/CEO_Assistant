@@ -13,6 +13,9 @@ const paymentRoutes = require('./modules/payment/payment.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
 const usersRoutes = require('./modules/users/users.routes');
 const billingRoutes = require('./modules/billing/billing.routes');
+const activitiesRoutes = require('./modules/activities/activities.routes');
+const salesRoutes = require('./modules/sales/sales.routes');
+const expensesRoutes = require('./modules/expenses/expenses.routes');
 
 // API Info endpoint
 router.get('/', (req, res) => {
@@ -30,6 +33,9 @@ router.get('/', (req, res) => {
       reports: '/api/v1/reports',
       payment: '/api/v1/payment',
       notifications: '/api/v1/notifications',
+      activities: '/api/v1/activities',
+      sales: '/api/v1/sales',
+      expenses: '/api/v1/expenses',
     },
     documentation: 'https://docs.ceoai-assistant.com',
   });
@@ -47,5 +53,8 @@ router.use('/payment', paymentRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/users', usersRoutes);
 router.use('/billing', billingRoutes);
+router.use('/activities', activitiesRoutes);
+router.use('/sales', salesRoutes);
+router.use('/expenses', expensesRoutes);
 
 module.exports = router;

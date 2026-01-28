@@ -34,11 +34,12 @@ module.exports = {
   UPLOAD_DIR: process.env.UPLOAD_DIR || './uploads',
 
   // Email Configuration (optional)
-  EMAIL_HOST: process.env.EMAIL_HOST || '',
-  EMAIL_PORT: parseInt(process.env.EMAIL_PORT) || 587,
-  EMAIL_USER: process.env.EMAIL_USER || '',
-  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
+  SMTP_HOST: process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com',
+  SMTP_PORT: parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587,
+  SMTP_USER: process.env.SMTP_USER || process.env.EMAIL_USER || '',
+  SMTP_PASSWORD: process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD || '',
   EMAIL_FROM: process.env.EMAIL_FROM || 'noreply@ceoai.com',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   // Redis Configuration (optional for caching)
   REDIS_HOST: process.env.REDIS_HOST || 'localhost',

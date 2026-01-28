@@ -1,15 +1,13 @@
 'use client'
 import React, { useState} from 'react';
 import { Eye, EyeOff, Briefcase, CheckCircle, Building2, User, Mail} from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
-import { saveAuthData } from '@/lib/auth';
 
 export default function RegisterPage() {
-    const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [registrationSuccess, setRegistrationSuccess] = useState(false);
     const [formData, setFormData] = useState({
         companyName: '',
         fullName: '',
@@ -73,7 +71,7 @@ export default function RegisterPage() {
             const lastName = nameParts.slice(1).join(' ') || nameParts[0];
 
             // Call real API
-            const response = await authAPI.register({
+            await authAPI.register({
                 email: formData.email,
                 password: formData.password,
                 firstName: firstName,
@@ -82,11 +80,8 @@ export default function RegisterPage() {
                 role: 'admin' // First user is admin by default
             });
 
-            // Save auth data to localStorage
-            saveAuthData(response.data);
-
-            // Redirect to dashboard
-            router.push('/dashboard/overview');
+            // Show success message instead of automatic login
+            setRegistrationSuccess(true);
         } catch (err) {
             console.error('Registration error:', err);
             setErrors({
@@ -133,6 +128,40 @@ export default function RegisterPage() {
     };
 
     const passwordStrength = getPasswordStrength();
+
+    // Show success message if registration is complete
+    if (registrationSuccess) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full">
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                Đăng ký thành công!
+              </h1>
+              <p className="text-gray-600 mb-6">
+                Chúng tôi đã gửi email xác thực đến <strong>{formData.email}</strong>. Vui lòng kiểm tra hộp thư và nhấp vào liên kết để kích hoạt tài khoản của bạn.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-gray-700">
+                  <strong>Lưu ý:</strong> Email có thể nằm trong thư mục spam. Nếu không thấy email sau 5 phút, vui lòng kiểm tra thư mục spam hoặc liên hệ hỗ trợ.
+                </p>
+              </div>
+              <a
+                href="/login"
+                className="block w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
+              >
+                Quay lại đăng nhập
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
     <div className="min-h-screen flex">
@@ -443,28 +472,6 @@ export default function RegisterPage() {
                   Thêm toàn bộ đội ngũ của bạn mà không tốn thêm chi phí
                 </p>
               </div>
-            </div>
-          </div>
-
-          <div className="mt-12 p-6 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/20">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="flex -space-x-2">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 border-2 border-white"></div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 border-2 border-white"></div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-400 border-2 border-white"></div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold">2,500+ công ty</p>
-                <p className="text-xs text-blue-100">đang sử dụng CEO Assistant</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <svg key={star} className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              ))}
-              <span className="ml-2 text-sm">4.9/5 từ 1,200+ đánh giá</span>
             </div>
           </div>
         </div>

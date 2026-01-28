@@ -38,6 +38,14 @@ async function apiRequest(endpoint, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
+      // Check if user needs to setup company
+      if (response.status === 403 && data.message?.includes('not associated with any company')) {
+        // Redirect to setup company page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/dashboard/setup-company';
+        }
+      }
+
       // Handle error responses
       throw new Error(data.message || 'API request failed');
     }
@@ -246,13 +254,28 @@ export const reportsAPI = {
   },
 
   /**
-   * Create new report
+   * Create new custom report
    */
   create: async (data) => {
-    return apiRequest('/reports', {
+    return apiRequest('/reports/custom', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  /**
+   * Get custom reports list
+   */
+  getCustomReports: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/reports/custom?${query}`);
+  },
+
+  /**
+   * Get custom report by ID
+   */
+  getCustomReport: async (id) => {
+    return apiRequest(`/reports/custom/${id}`);
   },
 
   /**
@@ -313,6 +336,16 @@ export const aiAPI = {
 
 export const companyAPI = {
   /**
+   * Create new company (for users without a company)
+   */
+  create: async (data) => {
+    return apiRequest('/company', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
    * Get company profile
    */
   getProfile: async () => {
@@ -344,6 +377,20 @@ export const companyAPI = {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  },
+
+  /**
+   * Search companies (public - no auth required)
+   */
+  search: async (searchTerm) => {
+    return apiRequest(`/company/search?q=${encodeURIComponent(searchTerm)}`);
+  },
+
+  /**
+   * Find company by tax code (public - no auth required)
+   */
+  findByTaxCode: async (taxCode) => {
+    return apiRequest(`/company/find-by-tax?taxCode=${encodeURIComponent(taxCode)}`);
   },
 };
 
@@ -518,6 +565,266 @@ export const billingAPI = {
 };
 
 // ============================================================================
+// ACTIVITIES API
+// ============================================================================
+
+export const activitiesAPI = {
+  /**
+   * Get all activities
+   */
+  getAll: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/activities?${query}`);
+  },
+
+  /**
+   * Get activity by ID
+   */
+  getById: async (id) => {
+    return apiRequest(`/activities/${id}`);
+  },
+
+  /**
+   * Create new activity
+   */
+  create: async (data) => {
+    return apiRequest('/activities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update activity
+   */
+  update: async (id, data) => {
+    return apiRequest(`/activities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete activity
+   */
+  delete: async (id) => {
+    return apiRequest(`/activities/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get activity statistics
+   */
+  getStats: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/activities/stats?${query}`);
+  },
+
+  /**
+   * Get top performers
+   */
+  getTopPerformers: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/activities/top-performers?${query}`);
+  },
+};
+
+// ============================================================================
+// SALES API
+// ============================================================================
+
+export const salesAPI = {
+  /**
+   * Get all sales
+   */
+  getAll: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sales?${query}`);
+  },
+
+  /**
+   * Get sale by ID
+   */
+  getById: async (id) => {
+    return apiRequest(`/sales/${id}`);
+  },
+
+  /**
+   * Create new sale
+   */
+  create: async (data) => {
+    return apiRequest('/sales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update sale
+   */
+  update: async (id, data) => {
+    return apiRequest(`/sales/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete sale
+   */
+  delete: async (id) => {
+    return apiRequest(`/sales/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get sales statistics
+   */
+  getStats: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sales/stats?${query}`);
+  },
+
+  /**
+   * Get top sales performers
+   */
+  getTopPerformers: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sales/top-performers?${query}`);
+  },
+
+  /**
+   * Get revenue trends
+   */
+  getTrends: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sales/trends?${query}`);
+  },
+
+  /**
+   * Get pending sales for approval
+   */
+  getPending: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sales/pending?${query}`);
+  },
+
+  /**
+   * Approve sale
+   */
+  approve: async (id) => {
+    return apiRequest(`/sales/${id}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Reject sale
+   */
+  reject: async (id, reason) => {
+    return apiRequest(`/sales/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+};
+
+// ============================================================================
+// EXPENSES API
+// ============================================================================
+
+export const expensesAPI = {
+  /**
+   * Get all expenses
+   */
+  getAll: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/expenses?${query}`);
+  },
+
+  /**
+   * Get expense by ID
+   */
+  getById: async (id) => {
+    return apiRequest(`/expenses/${id}`);
+  },
+
+  /**
+   * Create new expense
+   */
+  create: async (data) => {
+    return apiRequest('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update expense
+   */
+  update: async (id, data) => {
+    return apiRequest(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete expense
+   */
+  delete: async (id) => {
+    return apiRequest(`/expenses/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Approve expense
+   */
+  approve: async (id) => {
+    return apiRequest(`/expenses/${id}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Reject expense
+   */
+  reject: async (id, reason) => {
+    return apiRequest(`/expenses/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  /**
+   * Get expense statistics
+   */
+  getStats: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/expenses/stats?${query}`);
+  },
+
+  /**
+   * Get expenses by employee
+   */
+  getByEmployee: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/expenses/by-employee?${query}`);
+  },
+
+  /**
+   * Get pending expenses for approval
+   */
+  getPending: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/expenses/pending?${query}`);
+  },
+};
+
+// ============================================================================
 // AUTH API
 // ============================================================================
 
@@ -591,4 +898,7 @@ export default {
   notifications: notificationsAPI,
   billing: billingAPI,
   auth: authAPI,
+  activities: activitiesAPI,
+  sales: salesAPI,
+  expenses: expensesAPI,
 };

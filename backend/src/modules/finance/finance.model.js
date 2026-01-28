@@ -34,6 +34,16 @@ const revenueSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
     required: true
+  },
+  // Integration source - links to Sale when synced from employee input
+  sourceSaleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Sale'
+  },
+  sourceType: {
+    type: String,
+    enum: ['manual', 'employee_input'],
+    default: 'manual'
   }
 }, {
   timestamps: true
@@ -74,6 +84,16 @@ const expenseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
     required: true
+  },
+  // Integration source - links to CompanyExpense when synced from employee input
+  sourceExpenseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CompanyExpense'
+  },
+  sourceType: {
+    type: String,
+    enum: ['manual', 'employee_input'],
+    default: 'manual'
   }
 }, {
   timestamps: true

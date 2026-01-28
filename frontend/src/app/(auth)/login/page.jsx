@@ -240,15 +240,6 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-
-          <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-sm text-blue-100">
-              "CEO Assistant đã giúp tôi tiết kiệm hơn 15 giờ mỗi tuần và đưa ra quyết định nhanh hơn 3 lần."
-            </p>
-            <p className="text-sm font-semibold mt-2">
-              — Nguyễn Văn A, CEO của TechCorp
-            </p>
-          </div>
         </div>
       </div>
     </div>

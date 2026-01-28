@@ -1,78 +1,20 @@
+const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const config = require('../../config/env');
-const UserModel = require('../../models/user.model');
-
-// Simple password hashing using crypto (in production, use bcrypt)
-const hashPassword = (password) => {
-  return crypto
-    .createHmac('sha256', config.JWT_SECRET)
-    .update(password)
-    .digest('hex');
-};
-
-// Compare password
-const comparePassword = (password, hashedPassword) => {
-  const hash = hashPassword(password);
-  return hash === hashedPassword;
-};
+const User = require('../../models/User');
+const emailService = require('../../utils/emailService');
 
 // Generate JWT token
 const generateToken = (userId, expiresIn = config.JWT_EXPIRES_IN) => {
-  // Simple JWT implementation (in production, use jsonwebtoken library)
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    userId,
-    iat: Date.now(),
-    exp: Date.now() + parseTimeToMs(expiresIn)
-  })).toString('base64url');
-
-  const signature = crypto
-    .createHmac('sha256', config.JWT_SECRET)
-    .update(`${header}.${payload}`)
-    .digest('base64url');
-
-  return `${header}.${payload}.${signature}`;
+  return jwt.sign({ userId }, config.JWT_SECRET, { expiresIn });
 };
 
 // Verify JWT token
 const verifyToken = (token) => {
   try {
-    const [header, payload, signature] = token.split('.');
-
-    // Verify signature
-    const expectedSignature = crypto
-      .createHmac('sha256', config.JWT_SECRET)
-      .update(`${header}.${payload}`)
-      .digest('base64url');
-
-    if (signature !== expectedSignature) {
-      return null;
-    }
-
-    const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
-
-    // Check expiration
-    if (decodedPayload.exp < Date.now()) {
-      return null;
-    }
-
-    return decodedPayload;
+    return jwt.verify(token, config.JWT_SECRET);
   } catch (error) {
     return null;
-  }
-};
-
-// Parse time string to milliseconds
-const parseTimeToMs = (timeStr) => {
-  const unit = timeStr.slice(-1);
-  const value = parseInt(timeStr.slice(0, -1));
-
-  switch (unit) {
-    case 's': return value * 1000;
-    case 'm': return value * 60 * 1000;
-    case 'h': return value * 60 * 60 * 1000;
-    case 'd': return value * 24 * 60 * 60 * 1000;
-    default: return value;
   }
 };
 
@@ -86,48 +28,69 @@ const authService = {
    * Register a new user
    */
   register: async (userData) => {
-    const { email, password, firstName, lastName, role } = userData;
+    const { email, password, firstName, lastName, role, companyId, position, department, phone } = userData;
 
     // Check if user already exists
-    const existingUser = UserModel.findByEmail(email);
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       throw new Error('User with this email already exists');
     }
 
     // Validate password strength
-    if (password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
     }
-
-    // Hash password
-    const hashedPassword = hashPassword(password);
 
     // Generate email verification token
     const emailVerificationToken = generateRandomToken();
 
-    // Create user
-    const user = UserModel.create({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: role || 'user',
+    // Create user (password is hashed by the User model pre-save hook)
+    const user = await User.create({
+      email: email.toLowerCase(),
+      password,
+      name: `${firstName} ${lastName}`,
+      phone: phone || undefined,
+      role: role || 'employee',
+      companyId: companyId || undefined,
+      position: position || undefined,
+      department: department || undefined,
       emailVerificationToken,
       isEmailVerified: false
     });
 
     // Generate tokens
-    const accessToken = generateToken(user.id);
-    const refreshToken = generateToken(user.id, config.JWT_REFRESH_EXPIRES_IN);
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateToken(user._id, config.JWT_REFRESH_EXPIRES_IN);
 
     // Save refresh token
-    UserModel.update(user.id, { refreshToken });
+    user.refreshTokens.push({
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    });
+    await user.save();
+
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail(user.email, emailVerificationToken, user.name);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      // Don't fail registration if email fails
+    }
 
     return {
-      user: user.toJSON(),
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId,
+        position: user.position,
+        department: user.department,
+        isEmailVerified: user.isEmailVerified
+      },
       accessToken,
       refreshToken,
-      emailVerificationToken // In production, send this via email
+      emailVerificationToken
     };
   },
 
@@ -135,26 +98,44 @@ const authService = {
    * Login user
    */
   login: async (email, password) => {
-    // Find user
-    const user = UserModel.findByEmail(email);
+    // Find user with password field
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     if (!user) {
       throw new Error('Invalid email or password');
     }
 
     // Verify password
-    if (!comparePassword(password, user.password)) {
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       throw new Error('Invalid email or password');
     }
 
-    // Generate tokens
-    const accessToken = generateToken(user.id);
-    const refreshToken = generateToken(user.id, config.JWT_REFRESH_EXPIRES_IN);
+    // Check if user is active
+    if (!user.isActive) {
+      throw new Error('Your account has been deactivated');
+    }
 
-    // Save refresh token
-    UserModel.update(user.id, { refreshToken });
+    // Generate tokens
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateToken(user._id, config.JWT_REFRESH_EXPIRES_IN);
+
+    // Save refresh token and update last login
+    user.refreshTokens.push({
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    user.lastLogin = new Date();
+    await user.save();
 
     return {
-      user: user.toJSON(),
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        companyId: user.companyId
+      },
       accessToken,
       refreshToken
     };
@@ -164,8 +145,8 @@ const authService = {
    * Logout user
    */
   logout: async (userId) => {
-    // Clear refresh token
-    UserModel.update(userId, { refreshToken: null });
+    // Clear all refresh tokens
+    await User.findByIdAndUpdate(userId, { refreshTokens: [] });
     return { success: true };
   },
 
@@ -179,18 +160,27 @@ const authService = {
       throw new Error('Invalid or expired refresh token');
     }
 
-    // Find user by refresh token
-    const user = UserModel.findByRefreshToken(refreshToken);
+    // Find user with this refresh token
+    const user = await User.findOne({
+      _id: decoded.userId,
+      'refreshTokens.token': refreshToken
+    });
+
     if (!user) {
       throw new Error('Invalid refresh token');
     }
 
     // Generate new access token
-    const newAccessToken = generateToken(user.id);
+    const newAccessToken = generateToken(user._id);
 
     return {
       accessToken: newAccessToken,
-      user: user.toJSON()
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
     };
   },
 
@@ -198,27 +188,31 @@ const authService = {
    * Request password reset
    */
   forgotPassword: async (email) => {
-    // Find user
-    const user = UserModel.findByEmail(email);
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      // Don't reveal if user exists for security
       return { success: true, message: 'If the email exists, a reset link will be sent' };
     }
 
     // Generate reset token
     const resetToken = generateRandomToken();
-    const resetExpires = Date.now() + 3600000; // 1 hour
+    const resetExpires = new Date(Date.now() + 3600000); // 1 hour
 
     // Save reset token
-    UserModel.update(user.id, {
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: resetExpires
-    });
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = resetExpires;
+    await user.save();
+
+    // Send password reset email
+    try {
+      await emailService.sendPasswordResetEmail(user.email, resetToken, user.name);
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      throw new Error('Failed to send password reset email');
+    }
 
     return {
       success: true,
-      resetToken, // In production, send this via email
-      message: 'Password reset token generated'
+      message: 'Password reset email sent successfully'
     };
   },
 
@@ -226,26 +220,24 @@ const authService = {
    * Reset password with token
    */
   resetPassword: async (token, newPassword) => {
-    // Find user by reset token
-    const user = UserModel.findByResetToken(token);
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
     if (!user) {
       throw new Error('Invalid or expired reset token');
     }
 
-    // Validate new password
     if (newPassword.length < 8) {
       throw new Error('Password must be at least 8 characters long');
     }
 
-    // Hash new password
-    const hashedPassword = hashPassword(newPassword);
-
-    // Update password and clear reset token
-    UserModel.update(user.id, {
-      password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
-    });
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
 
     return { success: true, message: 'Password reset successful' };
   },
@@ -254,17 +246,22 @@ const authService = {
    * Verify email with token
    */
   verifyEmail: async (token) => {
-    // Find user by email token
-    const user = UserModel.findByEmailToken(token);
+    const user = await User.findOne({ emailVerificationToken: token });
     if (!user) {
       throw new Error('Invalid email verification token');
     }
 
-    // Update user
-    UserModel.update(user.id, {
-      isEmailVerified: true,
-      emailVerificationToken: null
-    });
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    await user.save();
+
+    // Send welcome email
+    try {
+      await emailService.sendWelcomeEmail(user.email, user.name);
+    } catch (error) {
+      console.error('Failed to send welcome email:', error);
+      // Don't fail verification if welcome email fails
+    }
 
     return { success: true, message: 'Email verified successfully' };
   },
@@ -278,12 +275,20 @@ const authService = {
       throw new Error('Invalid or expired token');
     }
 
-    const user = UserModel.findById(decoded.userId);
+    const user = await User.findById(decoded.userId);
     if (!user) {
       throw new Error('User not found');
     }
 
-    return user.toJSON();
+    return {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
+      companyId: user.companyId,
+      permissions: user.permissions
+    };
   },
 
   /**
@@ -294,51 +299,54 @@ const authService = {
 
     // Check if email is being changed and if it's already in use
     if (email) {
-      const existingUser = UserModel.findByEmail(email);
-      if (existingUser && existingUser.id !== parseInt(userId)) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser && existingUser._id.toString() !== userId) {
         throw new Error('Email already in use');
       }
     }
 
-    // Update user
-    const updatedUser = UserModel.update(userId, {
-      ...(firstName && { firstName }),
-      ...(lastName && { lastName }),
-      ...(email && { email, isEmailVerified: false }) // Re-verify if email changed
-    });
+    const updateFields = {};
+    if (firstName && lastName) {
+      updateFields.name = `${firstName} ${lastName}`;
+    }
+    if (email) {
+      updateFields.email = email.toLowerCase();
+      updateFields.isEmailVerified = false;
+    }
 
-    if (!updatedUser) {
+    const user = await User.findByIdAndUpdate(userId, updateFields, { new: true });
+    if (!user) {
       throw new Error('User not found');
     }
 
-    return updatedUser.toJSON();
+    return {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    };
   },
 
   /**
    * Change password
    */
   changePassword: async (userId, oldPassword, newPassword) => {
-    // Find user
-    const user = UserModel.findById(userId);
+    const user = await User.findById(userId).select('+password');
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Verify old password
-    if (!comparePassword(oldPassword, user.password)) {
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
       throw new Error('Current password is incorrect');
     }
 
-    // Validate new password
     if (newPassword.length < 8) {
       throw new Error('Password must be at least 8 characters long');
     }
 
-    // Hash new password
-    const hashedPassword = hashPassword(newPassword);
-
-    // Update password
-    UserModel.update(userId, { password: hashedPassword });
+    user.password = newPassword;
+    await user.save();
 
     return { success: true, message: 'Password changed successfully' };
   },

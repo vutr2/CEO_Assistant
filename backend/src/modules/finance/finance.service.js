@@ -1,171 +1,88 @@
-// Multi-tenant Financial Service
-// Data is stored per company using companyId as key
+// Multi-tenant Financial Service using MongoDB
 
-const dataByCompany = {};
-let revenueIdCounter = 1;
-let expenseIdCounter = 1;
-let budgetIdCounter = 1;
-
-// Initialize company data if not exists
-const initCompanyData = (companyId) => {
-  const key = companyId?.toString() || 'default';
-  if (!dataByCompany[key]) {
-    dataByCompany[key] = {
-      revenue: [],
-      expenses: [],
-      budgets: []
-    };
-    generateMockDataForCompany(key);
-  }
-  return dataByCompany[key];
-};
-
-// Generate mock financial data for a company
-const generateMockDataForCompany = (companyKey) => {
-  const data = dataByCompany[companyKey];
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
-
-  // Generate revenue for last 12 months
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date(currentYear, currentMonth - i, 15);
-    data.revenue.push({
-      id: revenueIdCounter++,
-      companyId: companyKey,
-      amount: Math.floor(Math.random() * 500000000) + 300000000, // VND
-      source: ['Bán hàng', 'Dịch vụ', 'Đăng ký', 'Tư vấn'][Math.floor(Math.random() * 4)],
-      category: 'revenue',
-      date: date.toISOString(),
-      description: `Doanh thu ${date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`,
-      createdAt: date.toISOString()
-    });
-  }
-
-  // Generate expenses for last 12 months
-  const expenseCategories = ['Lương', 'Marketing', 'Thuê văn phòng', 'Công nghệ', 'Điện nước', 'Công tác'];
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date(currentYear, currentMonth - i, Math.floor(Math.random() * 28) + 1);
-    const category = expenseCategories[Math.floor(Math.random() * expenseCategories.length)];
-    data.expenses.push({
-      id: expenseIdCounter++,
-      companyId: companyKey,
-      amount: Math.floor(Math.random() * 150000000) + 50000000, // VND
-      category,
-      date: date.toISOString(),
-      description: `Chi phí ${category} ${date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`,
-      vendor: `Nhà cung cấp ${Math.floor(Math.random() * 100)}`,
-      status: ['paid', 'pending', 'overdue'][Math.floor(Math.random() * 3)],
-      createdAt: date.toISOString()
-    });
-  }
-
-  // Generate budget for current year
-  data.budgets.push({
-    id: budgetIdCounter++,
-    companyId: companyKey,
-    year: currentYear,
-    totalBudget: 5000000000,
-    categories: {
-      salaries: 2000000000,
-      marketing: 800000000,
-      technology: 700000000,
-      operations: 500000000,
-      other: 1000000000
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
-};
+const { Revenue, Expense, Budget } = require('./finance.model');
+const logger = require('../../utils/logger');
 
 // Helper functions
 function isSameMonth(date1, date2) {
   return date1.getMonth() === date2.getMonth() && date1.getFullYear() === date2.getFullYear();
 }
 
-function calculateMetrics(data, period) {
-  const currentDate = new Date();
-  let current = 0;
-  let previous = 0;
-
-  if (period === 'monthly') {
-    current = data
-      .filter(item => new Date(item.date).getMonth() === currentDate.getMonth())
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    previous = data
-      .filter(item => new Date(item.date).getMonth() === currentDate.getMonth() - 1)
-      .reduce((sum, item) => sum + item.amount, 0);
-  }
-
-  const growth = previous > 0 ? ((current - previous) / previous) * 100 : 0;
-  return { current, previous, growth };
-}
-
-function getTopExpenseCategories(expenseData) {
-  const categoryTotals = {};
-
-  expenseData.forEach(expense => {
-    if (!categoryTotals[expense.category]) {
-      categoryTotals[expense.category] = 0;
-    }
-    categoryTotals[expense.category] += expense.amount;
-  });
-
-  return Object.entries(categoryTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([category, amount]) => ({ category, amount }));
-}
-
 const financeService = {
   /**
    * Get financial overview for a company
-   * @param {string} companyId - Company ID for multi-tenant filtering
    */
   getFinancialOverview: async (companyId) => {
-    const data = initCompanyData(companyId);
-    const revenueData = data.revenue;
-    const expenseData = data.expenses;
-    const currentMonth = new Date().getMonth();
+    logger.info('Getting financial overview', { companyId });
 
-    // Calculate totals
-    const totalRevenue = revenueData.reduce((sum, item) => sum + item.amount, 0);
-    const totalExpenses = expenseData.reduce((sum, item) => sum + item.amount, 0);
-    const netProfit = totalRevenue - totalExpenses;
+    if (!companyId) {
+      return {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        profitMargin: 0,
+        currentMonth: { revenue: 0, expenses: 0, profit: 0 },
+        growth: { revenue: '0', expenses: '0' },
+        topExpenseCategories: []
+      };
+    }
 
-    // Current month data
-    const currentMonthRevenue = revenueData
-      .filter(item => new Date(item.date).getMonth() === currentMonth)
-      .reduce((sum, item) => sum + item.amount, 0);
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
 
-    const currentMonthExpenses = expenseData
-      .filter(item => new Date(item.date).getMonth() === currentMonth)
-      .reduce((sum, item) => sum + item.amount, 0);
+    // Get total revenue and expenses
+    const [totalRevenue, totalExpenses] = await Promise.all([
+      Revenue.aggregate([
+        { $match: { companyId, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, status: { $in: ['approved', 'paid'] } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
+    ]);
 
-    // Calculate growth rates
-    const lastMonthRevenue = revenueData
-      .filter(item => new Date(item.date).getMonth() === currentMonth - 1)
-      .reduce((sum, item) => sum + item.amount, 0);
+    const totalRevenueAmount = totalRevenue[0]?.total || 0;
+    const totalExpensesAmount = totalExpenses[0]?.total || 0;
+    const netProfit = totalRevenueAmount - totalExpensesAmount;
 
-    const revenueGrowth = lastMonthRevenue > 0
-      ? ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
-      : 0;
+    // Get current month data
+    const startOfMonth = new Date(currentYear, currentMonth, 1);
+    const endOfMonth = new Date(currentYear, currentMonth + 1, 0);
+
+    const [currentMonthRevenue, currentMonthExpenses] = await Promise.all([
+      Revenue.aggregate([
+        { $match: { companyId, date: { $gte: startOfMonth, $lte: endOfMonth }, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, date: { $gte: startOfMonth, $lte: endOfMonth }, status: { $in: ['approved', 'paid'] } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
+    ]);
+
+    // Get top expense categories
+    const topExpenseCategories = await Expense.aggregate([
+      { $match: { companyId } },
+      { $group: { _id: '$category', amount: { $sum: '$amount' } } },
+      { $sort: { amount: -1 } },
+      { $limit: 5 },
+      { $project: { category: '$_id', amount: 1, _id: 0 } }
+    ]);
 
     return {
-      totalRevenue,
-      totalExpenses,
+      totalRevenue: totalRevenueAmount,
+      totalExpenses: totalExpensesAmount,
       netProfit,
-      profitMargin: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
+      profitMargin: totalRevenueAmount > 0 ? (netProfit / totalRevenueAmount) * 100 : 0,
       currentMonth: {
-        revenue: currentMonthRevenue,
-        expenses: currentMonthExpenses,
-        profit: currentMonthRevenue - currentMonthExpenses
+        revenue: currentMonthRevenue[0]?.total || 0,
+        expenses: currentMonthExpenses[0]?.total || 0,
+        profit: (currentMonthRevenue[0]?.total || 0) - (currentMonthExpenses[0]?.total || 0)
       },
-      growth: {
-        revenue: revenueGrowth.toFixed(2),
-        expenses: 0
-      },
-      topExpenseCategories: getTopExpenseCategories(expenseData)
+      growth: { revenue: '0', expenses: '0' },
+      topExpenseCategories
     };
   },
 
@@ -173,35 +90,40 @@ const financeService = {
    * Get all revenue records for a company
    */
   getRevenue: async (companyId, filters = {}) => {
-    const data = initCompanyData(companyId);
-    let filtered = [...data.revenue];
+    logger.info('Getting revenue', { companyId, filters });
+
+    const query = {};
+    if (companyId) query.companyId = companyId;
 
     if (filters.startDate) {
-      filtered = filtered.filter(item => new Date(item.date) >= new Date(filters.startDate));
+      query.date = { ...query.date, $gte: new Date(filters.startDate) };
     }
     if (filters.endDate) {
-      filtered = filtered.filter(item => new Date(item.date) <= new Date(filters.endDate));
+      query.date = { ...query.date, $lte: new Date(filters.endDate) };
     }
     if (filters.source) {
-      filtered = filtered.filter(item => item.source === filters.source);
+      query.source = filters.source;
     }
 
-    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const revenue = await Revenue.find(query).sort({ date: -1 });
+    return revenue;
   },
 
   /**
    * Add new revenue record
    */
   addRevenue: async (companyId, revenueRecord) => {
-    const data = initCompanyData(companyId);
-    const newRevenue = {
-      id: revenueIdCounter++,
+    logger.info('Adding revenue', { companyId });
+
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    const newRevenue = await Revenue.create({
       companyId,
-      ...revenueRecord,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    data.revenue.push(newRevenue);
+      ...revenueRecord
+    });
+
     return newRevenue;
   },
 
@@ -209,75 +131,73 @@ const financeService = {
    * Get revenue by ID
    */
   getRevenueById: async (companyId, id) => {
-    const data = initCompanyData(companyId);
-    return data.revenue.find(item => item.id === parseInt(id));
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
+    return await Revenue.findOne(query);
   },
 
   /**
    * Update revenue record
    */
   updateRevenue: async (companyId, id, updateData) => {
-    const data = initCompanyData(companyId);
-    const index = data.revenue.findIndex(item => item.id === parseInt(id));
-    if (index === -1) return null;
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
 
-    data.revenue[index] = {
-      ...data.revenue[index],
-      ...updateData,
-      updatedAt: new Date().toISOString()
-    };
-    return data.revenue[index];
+    return await Revenue.findOneAndUpdate(query, { $set: updateData }, { new: true });
   },
 
   /**
    * Delete revenue record
    */
   deleteRevenue: async (companyId, id) => {
-    const data = initCompanyData(companyId);
-    const index = data.revenue.findIndex(item => item.id === parseInt(id));
-    if (index === -1) return false;
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
 
-    data.revenue.splice(index, 1);
-    return true;
+    const result = await Revenue.deleteOne(query);
+    return result.deletedCount > 0;
   },
 
   /**
    * Get all expenses for a company
    */
   getExpenses: async (companyId, filters = {}) => {
-    const data = initCompanyData(companyId);
-    let filtered = [...data.expenses];
+    logger.info('Getting expenses', { companyId, filters });
+
+    const query = {};
+    if (companyId) query.companyId = companyId;
 
     if (filters.startDate) {
-      filtered = filtered.filter(item => new Date(item.date) >= new Date(filters.startDate));
+      query.date = { ...query.date, $gte: new Date(filters.startDate) };
     }
     if (filters.endDate) {
-      filtered = filtered.filter(item => new Date(item.date) <= new Date(filters.endDate));
+      query.date = { ...query.date, $lte: new Date(filters.endDate) };
     }
     if (filters.category) {
-      filtered = filtered.filter(item => item.category === filters.category);
+      query.category = filters.category;
     }
     if (filters.status) {
-      filtered = filtered.filter(item => item.status === filters.status);
+      query.status = filters.status;
     }
 
-    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const expenses = await Expense.find(query).sort({ date: -1 });
+    return expenses;
   },
 
   /**
    * Add new expense record
    */
   addExpense: async (companyId, expenseRecord) => {
-    const data = initCompanyData(companyId);
-    const newExpense = {
-      id: expenseIdCounter++,
+    logger.info('Adding expense', { companyId });
+
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    const newExpense = await Expense.create({
       companyId,
-      ...expenseRecord,
-      status: expenseRecord.status || 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    data.expenses.push(newExpense);
+      ...expenseRecord
+    });
+
     return newExpense;
   },
 
@@ -285,85 +205,134 @@ const financeService = {
    * Get expense by ID
    */
   getExpenseById: async (companyId, id) => {
-    const data = initCompanyData(companyId);
-    return data.expenses.find(item => item.id === parseInt(id));
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
+    return await Expense.findOne(query);
   },
 
   /**
    * Update expense record
    */
   updateExpense: async (companyId, id, updateData) => {
-    const data = initCompanyData(companyId);
-    const index = data.expenses.findIndex(item => item.id === parseInt(id));
-    if (index === -1) return null;
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
 
-    data.expenses[index] = {
-      ...data.expenses[index],
-      ...updateData,
-      updatedAt: new Date().toISOString()
-    };
-    return data.expenses[index];
+    return await Expense.findOneAndUpdate(query, { $set: updateData }, { new: true });
   },
 
   /**
    * Delete expense record
    */
   deleteExpense: async (companyId, id) => {
-    const data = initCompanyData(companyId);
-    const index = data.expenses.findIndex(item => item.id === parseInt(id));
-    if (index === -1) return false;
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
 
-    data.expenses.splice(index, 1);
-    return true;
+    const result = await Expense.deleteOne(query);
+    return result.deletedCount > 0;
   },
 
   /**
    * Get financial metrics
    */
   getFinancialMetrics: async (companyId, period = 'monthly') => {
-    const data = initCompanyData(companyId);
-    const metrics = {
-      revenue: calculateMetrics(data.revenue, period),
-      expenses: calculateMetrics(data.expenses, period),
+    logger.info('Getting financial metrics', { companyId, period });
+
+    // Return empty metrics if no companyId
+    if (!companyId) {
+      return {
+        revenue: { current: 0, previous: 0, growth: 0 },
+        expenses: { current: 0, previous: 0, growth: 0 },
+        profit: { current: 0, previous: 0, growth: 0 }
+      };
+    }
+
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    const startOfCurrentMonth = new Date(currentYear, currentMonth, 1);
+    const startOfPreviousMonth = new Date(currentYear, currentMonth - 1, 1);
+    const endOfPreviousMonth = new Date(currentYear, currentMonth, 0);
+
+    const [currentRevenue, previousRevenue, currentExpenses, previousExpenses] = await Promise.all([
+      Revenue.aggregate([
+        { $match: { companyId, date: { $gte: startOfCurrentMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Revenue.aggregate([
+        { $match: { companyId, date: { $gte: startOfPreviousMonth, $lte: endOfPreviousMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, date: { $gte: startOfCurrentMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, date: { $gte: startOfPreviousMonth, $lte: endOfPreviousMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
+    ]);
+
+    const currentRev = currentRevenue[0]?.total || 0;
+    const prevRev = previousRevenue[0]?.total || 0;
+    const currentExp = currentExpenses[0]?.total || 0;
+    const prevExp = previousExpenses[0]?.total || 0;
+
+    return {
+      revenue: {
+        current: currentRev,
+        previous: prevRev,
+        growth: prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : 0
+      },
+      expenses: {
+        current: currentExp,
+        previous: prevExp,
+        growth: prevExp > 0 ? ((currentExp - prevExp) / prevExp) * 100 : 0
+      },
       profit: {
-        current: 0,
-        previous: 0,
-        growth: 0
+        current: currentRev - currentExp,
+        previous: prevRev - prevExp,
+        growth: (prevRev - prevExp) > 0 ? (((currentRev - currentExp) - (prevRev - prevExp)) / (prevRev - prevExp)) * 100 : 0
       }
     };
-
-    metrics.profit.current = metrics.revenue.current - metrics.expenses.current;
-    metrics.profit.previous = metrics.revenue.previous - metrics.expenses.previous;
-    metrics.profit.growth = metrics.profit.previous > 0
-      ? ((metrics.profit.current - metrics.profit.previous) / metrics.profit.previous) * 100
-      : 0;
-
-    return metrics;
   },
 
   /**
    * Get financial trends
    */
   getFinancialTrends: async (companyId, months = 12) => {
-    const data = initCompanyData(companyId);
+    logger.info('Getting financial trends', { companyId, months });
+
+    if (!companyId) {
+      return [];
+    }
+
     const trends = [];
     const currentDate = new Date();
 
     for (let i = months - 1; i >= 0; i--) {
-      const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthRevenue = data.revenue
-        .filter(item => isSameMonth(new Date(item.date), targetDate))
-        .reduce((sum, item) => sum + item.amount, 0);
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i + 1, 0);
 
-      const monthExpenses = data.expenses
-        .filter(item => isSameMonth(new Date(item.date), targetDate))
-        .reduce((sum, item) => sum + item.amount, 0);
+      const [monthRevenue, monthExpenses] = await Promise.all([
+        Revenue.aggregate([
+          { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Expense.aggregate([
+          { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+      ]);
+
+      const revenue = monthRevenue[0]?.total || 0;
+      const expenses = monthExpenses[0]?.total || 0;
 
       trends.push({
-        month: targetDate.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }),
-        revenue: monthRevenue,
-        expenses: monthExpenses,
-        profit: monthRevenue - monthExpenses
+        month: startDate.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }),
+        revenue,
+        expenses,
+        profit: revenue - expenses
       });
     }
 
@@ -371,54 +340,35 @@ const financeService = {
   },
 
   /**
-   * Get financial forecast
-   */
-  getFinancialForecast: async (companyId, months = 6) => {
-    const trends = await financeService.getFinancialTrends(companyId, 12);
-    const avgRevenue = trends.reduce((sum, item) => sum + item.revenue, 0) / trends.length;
-    const avgExpenses = trends.reduce((sum, item) => sum + item.expenses, 0) / trends.length;
-
-    const forecast = [];
-    const currentDate = new Date();
-
-    for (let i = 1; i <= months; i++) {
-      const forecastDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-      const revenueGrowth = 1 + (Math.random() * 0.1 - 0.05);
-      const expenseGrowth = 1 + (Math.random() * 0.08 - 0.04);
-
-      forecast.push({
-        month: forecastDate.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }),
-        predictedRevenue: Math.round(avgRevenue * revenueGrowth),
-        predictedExpenses: Math.round(avgExpenses * expenseGrowth),
-        confidence: 85 - (i * 5)
-      });
-    }
-
-    return forecast;
-  },
-
-  /**
    * Get budget
    */
   getBudget: async (companyId, year) => {
-    const data = initCompanyData(companyId);
+    if (!companyId) return null;
+
     const targetYear = year || new Date().getFullYear();
-    return data.budgets.find(budget => budget.year === parseInt(targetYear));
+    const startOfYear = new Date(targetYear, 0, 1);
+    const endOfYear = new Date(targetYear, 11, 31);
+
+    return await Budget.findOne({
+      companyId,
+      startDate: { $gte: startOfYear },
+      endDate: { $lte: endOfYear }
+    });
   },
 
   /**
    * Create budget
    */
   createBudget: async (companyId, budgetInfo) => {
-    const data = initCompanyData(companyId);
-    const newBudget = {
-      id: budgetIdCounter++,
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    const newBudget = await Budget.create({
       companyId,
-      ...budgetInfo,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    data.budgets.push(newBudget);
+      ...budgetInfo
+    });
+
     return newBudget;
   },
 
@@ -426,127 +376,98 @@ const financeService = {
    * Update budget
    */
   updateBudget: async (companyId, id, updateData) => {
-    const data = initCompanyData(companyId);
-    const index = data.budgets.findIndex(item => item.id === parseInt(id));
-    if (index === -1) return null;
+    const query = { _id: id };
+    if (companyId) query.companyId = companyId;
 
-    data.budgets[index] = {
-      ...data.budgets[index],
-      ...updateData,
-      updatedAt: new Date().toISOString()
-    };
-    return data.budgets[index];
-  },
-
-  /**
-   * Get cash flow data
-   */
-  getCashFlow: async (companyId, months = 12) => {
-    const data = initCompanyData(companyId);
-    const cashFlow = [];
-    const currentDate = new Date();
-    let runningBalance = 1000000000; // Starting balance
-
-    for (let i = months - 1; i >= 0; i--) {
-      const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthRevenue = data.revenue
-        .filter(item => isSameMonth(new Date(item.date), targetDate))
-        .reduce((sum, item) => sum + item.amount, 0);
-
-      const monthExpenses = data.expenses
-        .filter(item => isSameMonth(new Date(item.date), targetDate))
-        .reduce((sum, item) => sum + item.amount, 0);
-
-      const netCashFlow = monthRevenue - monthExpenses;
-      runningBalance += netCashFlow;
-
-      cashFlow.push({
-        month: targetDate.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }),
-        inflow: monthRevenue,
-        outflow: monthExpenses,
-        netCashFlow,
-        balance: runningBalance
-      });
-    }
-
-    return cashFlow;
+    return await Budget.findOneAndUpdate(query, { $set: updateData }, { new: true });
   },
 
   /**
    * Get overview by period (for Finance Dashboard page)
    */
   getOverviewByPeriod: async (companyId, period = 'month') => {
-    const data = initCompanyData(companyId);
-    const revenueData = data.revenue;
-    const expenseData = data.expenses;
-    const currentDate = new Date();
-    let revenue = 0;
-    let expense = 0;
-    let prevRevenue = 0;
-    let prevExpense = 0;
+    logger.info('Getting overview by period', { companyId, period });
 
-    if (period === 'week') {
-      const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-      revenue = revenueData.filter(item => new Date(item.date) >= weekAgo).reduce((sum, item) => sum + item.amount, 0);
-      expense = expenseData.filter(item => new Date(item.date) >= weekAgo).reduce((sum, item) => sum + item.amount, 0);
-
-      const twoWeeksAgo = new Date(currentDate.getTime() - 14 * 24 * 60 * 60 * 1000);
-      prevRevenue = revenueData.filter(item => new Date(item.date) >= twoWeeksAgo && new Date(item.date) < weekAgo).reduce((sum, item) => sum + item.amount, 0);
-      prevExpense = expenseData.filter(item => new Date(item.date) >= twoWeeksAgo && new Date(item.date) < weekAgo).reduce((sum, item) => sum + item.amount, 0);
-    } else if (period === 'month') {
-      revenue = revenueData.filter(item => new Date(item.date).getMonth() === currentDate.getMonth()).reduce((sum, item) => sum + item.amount, 0);
-      expense = expenseData.filter(item => new Date(item.date).getMonth() === currentDate.getMonth()).reduce((sum, item) => sum + item.amount, 0);
-
-      const lastMonth = currentDate.getMonth() - 1;
-      prevRevenue = revenueData.filter(item => new Date(item.date).getMonth() === lastMonth).reduce((sum, item) => sum + item.amount, 0);
-      prevExpense = expenseData.filter(item => new Date(item.date).getMonth() === lastMonth).reduce((sum, item) => sum + item.amount, 0);
-    } else if (period === 'quarter') {
-      const quarter = Math.floor(currentDate.getMonth() / 3);
-      const startMonth = quarter * 3;
-      revenue = revenueData.filter(item => {
-        const month = new Date(item.date).getMonth();
-        return month >= startMonth && month < startMonth + 3;
-      }).reduce((sum, item) => sum + item.amount, 0);
-      expense = expenseData.filter(item => {
-        const month = new Date(item.date).getMonth();
-        return month >= startMonth && month < startMonth + 3;
-      }).reduce((sum, item) => sum + item.amount, 0);
-
-      const prevStartMonth = (quarter - 1) * 3;
-      prevRevenue = revenueData.filter(item => {
-        const month = new Date(item.date).getMonth();
-        return month >= prevStartMonth && month < prevStartMonth + 3;
-      }).reduce((sum, item) => sum + item.amount, 0);
-      prevExpense = expenseData.filter(item => {
-        const month = new Date(item.date).getMonth();
-        return month >= prevStartMonth && month < prevStartMonth + 3;
-      }).reduce((sum, item) => sum + item.amount, 0);
-    } else if (period === 'year') {
-      revenue = revenueData.filter(item => new Date(item.date).getFullYear() === currentDate.getFullYear()).reduce((sum, item) => sum + item.amount, 0);
-      expense = expenseData.filter(item => new Date(item.date).getFullYear() === currentDate.getFullYear()).reduce((sum, item) => sum + item.amount, 0);
-
-      prevRevenue = revenueData.filter(item => new Date(item.date).getFullYear() === currentDate.getFullYear() - 1).reduce((sum, item) => sum + item.amount, 0);
-      prevExpense = expenseData.filter(item => new Date(item.date).getFullYear() === currentDate.getFullYear() - 1).reduce((sum, item) => sum + item.amount, 0);
+    if (!companyId) {
+      return {
+        revenue: 0,
+        expense: 0,
+        profit: 0,
+        cashflow: 0,
+        revenueChange: '0%',
+        expenseChange: '0%',
+        profitChange: '0%',
+        cashflowChange: '0%'
+      };
     }
 
-    const profit = revenue - expense;
-    const prevProfit = prevRevenue - prevExpense;
-    const cashflow = profit;
+    const currentDate = new Date();
+    let startDate, endDate, prevStartDate, prevEndDate;
 
-    const revenueChange = prevRevenue > 0 ? (((revenue - prevRevenue) / prevRevenue) * 100).toFixed(1) + '%' : '0%';
-    const expenseChange = prevExpense > 0 ? (((expense - prevExpense) / prevExpense) * 100).toFixed(1) + '%' : '0%';
-    const profitChange = prevProfit > 0 ? (((profit - prevProfit) / prevProfit) * 100).toFixed(1) + '%' : '0%';
-    const cashflowChange = prevProfit > 0 ? (((cashflow - prevProfit) / prevProfit) * 100).toFixed(1) + '%' : '0%';
+    if (period === 'week') {
+      startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      endDate = currentDate;
+      prevStartDate = new Date(currentDate.getTime() - 14 * 24 * 60 * 60 * 1000);
+      prevEndDate = startDate;
+    } else if (period === 'month') {
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      prevStartDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      prevEndDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+    } else if (period === 'quarter') {
+      const quarter = Math.floor(currentDate.getMonth() / 3);
+      startDate = new Date(currentDate.getFullYear(), quarter * 3, 1);
+      endDate = new Date(currentDate.getFullYear(), (quarter + 1) * 3, 0);
+      prevStartDate = new Date(currentDate.getFullYear(), (quarter - 1) * 3, 1);
+      prevEndDate = new Date(currentDate.getFullYear(), quarter * 3, 0);
+    } else {
+      startDate = new Date(currentDate.getFullYear(), 0, 1);
+      endDate = new Date(currentDate.getFullYear(), 11, 31);
+      prevStartDate = new Date(currentDate.getFullYear() - 1, 0, 1);
+      prevEndDate = new Date(currentDate.getFullYear() - 1, 11, 31);
+    }
+
+    const [revenue, expense, prevRevenue, prevExpense] = await Promise.all([
+      Revenue.aggregate([
+        { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Revenue.aggregate([
+        { $match: { companyId, date: { $gte: prevStartDate, $lte: prevEndDate } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Expense.aggregate([
+        { $match: { companyId, date: { $gte: prevStartDate, $lte: prevEndDate } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
+    ]);
+
+    const revenueAmount = revenue[0]?.total || 0;
+    const expenseAmount = expense[0]?.total || 0;
+    const prevRevenueAmount = prevRevenue[0]?.total || 0;
+    const prevExpenseAmount = prevExpense[0]?.total || 0;
+
+    const profit = revenueAmount - expenseAmount;
+    const prevProfit = prevRevenueAmount - prevExpenseAmount;
+
+    const calcChange = (current, previous) => {
+      if (previous === 0) return '0%';
+      return (((current - previous) / previous) * 100).toFixed(1) + '%';
+    };
 
     return {
-      revenue,
-      expense,
+      revenue: revenueAmount,
+      expense: expenseAmount,
       profit,
-      cashflow,
-      revenueChange,
-      expenseChange,
-      profitChange,
-      cashflowChange
+      cashflow: profit,
+      revenueChange: calcChange(revenueAmount, prevRevenueAmount),
+      expenseChange: calcChange(expenseAmount, prevExpenseAmount),
+      profitChange: calcChange(profit, prevProfit),
+      cashflowChange: calcChange(profit, prevProfit)
     };
   },
 
@@ -554,24 +475,34 @@ const financeService = {
    * Get recent transactions
    */
   getRecentTransactions: async (companyId, limit = 10) => {
-    const data = initCompanyData(companyId);
+    logger.info('Getting recent transactions', { companyId, limit });
+
+    if (!companyId) {
+      return [];
+    }
+
+    const [revenueRecords, expenseRecords] = await Promise.all([
+      Revenue.find({ companyId }).sort({ date: -1 }).limit(limit),
+      Expense.find({ companyId }).sort({ date: -1 }).limit(limit)
+    ]);
+
     const transactions = [];
 
-    data.revenue.forEach(item => {
+    revenueRecords.forEach(item => {
       transactions.push({
-        id: `rev_${item.id}`,
+        id: item._id,
         type: 'income',
         description: item.description,
         amount: item.amount,
         category: item.source,
         date: item.date,
-        status: 'completed'
+        status: item.status === 'completed' ? 'completed' : 'pending'
       });
     });
 
-    data.expenses.forEach(item => {
+    expenseRecords.forEach(item => {
       transactions.push({
-        id: `exp_${item.id}`,
+        id: item._id,
         type: 'expense',
         description: item.description,
         amount: item.amount,
@@ -590,44 +521,69 @@ const financeService = {
    * Get budget by period
    */
   getBudgetByPeriod: async (companyId, period = 'month') => {
-    const currentDate = new Date();
+    logger.info('Getting budget by period', { companyId, period });
 
-    const categories = [
-      { name: 'Nhân sự', total: 2000000000, used: 1650000000, color: 'blue' },
-      { name: 'Marketing', total: 800000000, used: 680000000, color: 'green' },
-      { name: 'Vận hành', total: 500000000, used: 450000000, color: 'purple' },
-      { name: 'Công nghệ', total: 700000000, used: 595000000, color: 'orange' },
-      { name: 'Khác', total: 1000000000, used: 750000000, color: 'pink' }
-    ];
-
-    const upcomingPayments = [
-      {
-        id: 1,
-        description: 'Tiền lương tháng 1',
-        amount: 180000000,
-        dueDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 25).toISOString(),
-        status: 'urgent'
-      },
-      {
-        id: 2,
-        description: 'Thuê văn phòng Q1',
-        amount: 50000000,
-        dueDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 28).toISOString(),
-        status: 'normal'
-      },
-      {
-        id: 3,
-        description: 'Hóa đơn AWS',
-        amount: 15000000,
-        dueDate: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 5).toISOString(),
-        status: 'normal'
-      }
-    ];
-
+    // Return empty structure if no data
     return {
-      categories,
-      upcomingPayments
+      categories: [],
+      upcomingPayments: []
     };
+  },
+
+  /**
+   * Get cash flow data
+   */
+  getCashFlow: async (companyId, months = 12) => {
+    logger.info('Getting cash flow', { companyId, months });
+
+    if (!companyId) {
+      return [];
+    }
+
+    const cashFlow = [];
+    const currentDate = new Date();
+    let runningBalance = 0;
+
+    for (let i = months - 1; i >= 0; i--) {
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i + 1, 0);
+
+      const [monthRevenue, monthExpenses] = await Promise.all([
+        Revenue.aggregate([
+          { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        Expense.aggregate([
+          { $match: { companyId, date: { $gte: startDate, $lte: endDate } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+      ]);
+
+      const inflow = monthRevenue[0]?.total || 0;
+      const outflow = monthExpenses[0]?.total || 0;
+      const netCashFlow = inflow - outflow;
+      runningBalance += netCashFlow;
+
+      cashFlow.push({
+        month: startDate.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }),
+        inflow,
+        outflow,
+        netCashFlow,
+        balance: runningBalance
+      });
+    }
+
+    return cashFlow;
+  },
+
+  /**
+   * Get financial forecast
+   */
+  getFinancialForecast: async (companyId, months = 6) => {
+    logger.info('Getting financial forecast', { companyId, months });
+
+    // TODO: Implement AI-powered forecasting
+    return [];
   }
 };
 

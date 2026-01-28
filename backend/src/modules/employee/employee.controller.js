@@ -3,8 +3,9 @@ const logger = require('../../utils/logger');
 
 const getAllEmployees = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const { page = 1, limit = 20, department, status } = req.query;
-    const result = await employeeService.getAllEmployees({ page, limit, department, status });
+    const result = await employeeService.getAllEmployees(companyId, { page, limit, department, status });
 
     res.status(200).json({
       success: true,
@@ -21,8 +22,9 @@ const getAllEmployees = async (req, res, next) => {
 
 const getEmployee = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const { id } = req.params;
-    const employee = await employeeService.getEmployee(id);
+    const employee = await employeeService.getEmployee(companyId, id);
     
     res.status(200).json({
       success: true,
@@ -36,8 +38,9 @@ const getEmployee = async (req, res, next) => {
 
 const createEmployee = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const employeeData = req.body;
-    const employee = await employeeService.createEmployee(employeeData);
+    const employee = await employeeService.createEmployee(companyId, employeeData);
     
     res.status(201).json({
       success: true,
@@ -52,9 +55,10 @@ const createEmployee = async (req, res, next) => {
 
 const updateEmployee = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const { id } = req.params;
     const updates = req.body;
-    const employee = await employeeService.updateEmployee(id, updates);
+    const employee = await employeeService.updateEmployee(companyId, id, updates);
     
     res.status(200).json({
       success: true,
@@ -69,8 +73,9 @@ const updateEmployee = async (req, res, next) => {
 
 const deleteEmployee = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const { id } = req.params;
-    await employeeService.deleteEmployee(id);
+    await employeeService.deleteEmployee(companyId, id);
     
     res.status(200).json({
       success: true,
@@ -84,7 +89,8 @@ const deleteEmployee = async (req, res, next) => {
 
 const getEmployeeStats = async (req, res, next) => {
   try {
-    const stats = await employeeService.getEmployeeStats();
+    const companyId = req.companyId;
+    const stats = await employeeService.getEmployeeStats(companyId);
 
     res.status(200).json({
       success: true,
@@ -98,8 +104,9 @@ const getEmployeeStats = async (req, res, next) => {
 
 const getTopPerformers = async (req, res, next) => {
   try {
+    const companyId = req.companyId;
     const { limit = 5 } = req.query;
-    const performers = await employeeService.getTopPerformers(parseInt(limit));
+    const performers = await employeeService.getTopPerformers(companyId, parseInt(limit));
 
     res.status(200).json({
       success: true,
@@ -113,7 +120,8 @@ const getTopPerformers = async (req, res, next) => {
 
 const getDepartments = async (req, res, next) => {
   try {
-    const departments = await employeeService.getDepartments();
+    const companyId = req.companyId;
+    const departments = await employeeService.getDepartments(companyId);
 
     res.status(200).json({
       success: true,

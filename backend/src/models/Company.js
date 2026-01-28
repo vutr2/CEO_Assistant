@@ -58,20 +58,49 @@ const companySchema = new mongoose.Schema({
   subscription: {
     plan: {
       type: String,
-      enum: ['free', 'professional', 'premium', 'enterprise'],
+      enum: ['free', 'starter', 'professional', 'enterprise'],
       default: 'free'
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'cancelled', 'expired'],
+      enum: ['active', 'inactive', 'cancelled', 'expired', 'trialing'],
       default: 'active'
     },
     startDate: Date,
     endDate: Date,
+    trialEndDate: Date,
     cancelAtPeriodEnd: {
       type: Boolean,
       default: false
-    }
+    },
+    // Shopify integration fields
+    shopifyCustomerId: {
+      type: String,
+      trim: true
+    },
+    shopifySubscriptionId: {
+      type: String,
+      trim: true
+    },
+    shopifyOrderId: {
+      type: String,
+      trim: true
+    },
+    // Features based on plan
+    features: [{
+      type: String,
+      enum: [
+        'basic_dashboard',
+        'employee_management',
+        'finance_tracking',
+        'reports',
+        'ai_assistant',
+        'advanced_analytics',
+        'priority_support',
+        'custom_integrations',
+        'unlimited_users'
+      ]
+    }]
   },
   // Settings
   settings: {
@@ -106,14 +135,13 @@ const companySchema = new mongoose.Schema({
 });
 
 // Generate slug from name before saving
-companySchema.pre('save', function(next) {
+companySchema.pre('save', function() {
   if (this.isModified('name')) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
-  next();
 });
 
 // Index for faster queries

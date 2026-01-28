@@ -1,8 +1,11 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Eye, EyeOff, Briefcase, CheckCircle, ShieldCheck, Lock } from 'lucide-react';
 
 export default function ResetPasswordPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -11,6 +14,16 @@ export default function ResetPasswordPage() {
     confirmPassword: ''
   });
   const [errors, setErrors] = useState({});
+  const [token, setToken] = useState('');
+
+  useEffect(() => {
+    const resetToken = searchParams.get('token');
+    if (!resetToken) {
+      setErrors({ general: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.' });
+    } else {
+      setToken(resetToken);
+    }
+  }, [searchParams]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -31,6 +44,11 @@ export default function ResetPasswordPage() {
   const handleSubmit = async () => {
     const newErrors = validateForm();
 
+    if (!token) {
+      setErrors({ general: 'Token không hợp lệ. Vui lòng yêu cầu đặt lại mật khẩu mới.' });
+      return;
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -39,14 +57,32 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     setErrors({});
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Password reset attempt:', formData);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          newPassword: formData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert('Đặt lại mật khẩu thành công! Chuyển đến trang đăng nhập...');
+        router.push('/login');
+      } else {
+        setErrors({ general: data.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.' });
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      setErrors({ general: 'Có lỗi xảy ra. Vui lòng thử lại sau.' });
+    } finally {
       setIsLoading(false);
-      alert('Đặt lại mật khẩu thành công! Chuyển đến trang đăng nhập...');
-      // Redirect to login page
-      window.location.href = '/login';
-    }, 1500);
+    }
   };
 
   const handleChange = (e) => {
@@ -106,6 +142,13 @@ export default function ResetPasswordPage() {
 
           {/* Reset Password Form */}
           <div className="space-y-5">
+            {/* General Error */}
+            {errors.general && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <p className="text-sm">{errors.general}</p>
+              </div>
+            )}
+
             {/* New Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const dashboardController = require('./dashboard.controller');
-const { authenticate } = require('../../middlewares/auth.middleware');
+const { authenticate, requireCompany } = require('../../middlewares/auth');
 
-// All dashboard routes (can be made optional for testing)
-// router.use(authenticate);
+// Apply authentication to all dashboard routes
+router.use(authenticate);
+router.use(requireCompany);
 
-// Dashboard Overview
+// Dashboard Overview - All authenticated users with company can view
 router.get('/overview', dashboardController.getOverview);
 router.get('/metrics', dashboardController.getMetrics);
 router.get('/activities', dashboardController.getActivities);

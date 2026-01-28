@@ -1,6 +1,6 @@
 'use client'
 import React from 'react';
-import { LayoutDashboard, DollarSign, Users, FileText, MessageSquare, Settings, X } from 'lucide-react';
+import { LayoutDashboard, DollarSign, Users, FileText, MessageSquare, Settings, X, TrendingUp, Receipt, Activity } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose, currentPath }) {
   const navigation = [
@@ -9,6 +9,12 @@ export default function Sidebar({ isOpen, onClose, currentPath }) {
     { name: 'Nhân sự', href: '/dashboard/people', icon: Users },
     { name: 'Báo cáo', href: '/dashboard/reports', icon: FileText },
     { name: 'Hỏi AI', href: '/dashboard/ask-ai', icon: MessageSquare },
+  ];
+
+  const employeeNavigation = [
+    { name: 'Bán hàng', href: '/dashboard/sales', icon: TrendingUp },
+    { name: 'Chi phí', href: '/dashboard/expenses', icon: Receipt },
+    { name: 'Hoạt động', href: '/dashboard/activities', icon: Activity },
   ];
 
   const isActive = (href) => currentPath === href;
@@ -56,6 +62,32 @@ export default function Sidebar({ isOpen, onClose, currentPath }) {
             </a>
           );
         })}
+
+        {/* Employee Input Section */}
+        <div className="pt-4 mt-4 border-t border-gray-200">
+          <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Nhập liệu
+          </p>
+          {employeeNavigation.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+
+            return (
+              <a
+                key={item.name}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  active
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={20} />
+                <span>{item.name}</span>
+              </a>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Settings */}
