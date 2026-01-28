@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
 
-export default function VerifyEmailPage() {
+// Separate component that uses useSearchParams
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState('verifying'); // verifying, success, error
@@ -21,19 +22,24 @@ export default function VerifyEmailPage() {
       }
 
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token }),
-        });
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          }
+        );
 
         const data = await response.json();
 
         if (response.ok && data.success) {
           setStatus('success');
-          setMessage('Email của bạn đã được xác thực thành công! Bạn sẽ được chuyển hướng đến trang đăng nhập...');
+          setMessage(
+            'Email của bạn đã được xác thực thành công! Bạn sẽ được chuyển hướng đến trang đăng nhập...'
+          );
 
           // Redirect to login after 3 seconds
           setTimeout(() => {
@@ -41,7 +47,10 @@ export default function VerifyEmailPage() {
           }, 3000);
         } else {
           setStatus('error');
-          setMessage(data.message || 'Xác thực email thất bại. Token có thể đã hết hạn hoặc không hợp lệ.');
+          setMessage(
+            data.message ||
+              'Xác thực email thất bại. Token có thể đã hết hạn hoặc không hợp lệ.'
+          );
         }
       } catch (error) {
         console.error('Verification error:', error);
@@ -84,9 +93,7 @@ export default function VerifyEmailPage() {
           </h1>
 
           {/* Message */}
-          <p className="text-gray-600 mb-8">
-            {message}
-          </p>
+          <p className="text-gray-600 mb-8">{message}</p>
 
           {/* Actions */}
           <div className="space-y-3">
@@ -121,7 +128,10 @@ export default function VerifyEmailPage() {
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-500">
               Cần hỗ trợ?{' '}
-              <a href="mailto:support@ceoassistant.com" className="text-blue-600 hover:text-blue-700 font-medium">
+              <a
+                href="mailto:support@ceoassistant.com"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
                 Liên hệ chúng tôi
               </a>
             </p>
@@ -129,5 +139,32 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function VerifyEmailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full">
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                </div>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                Đang tải...
+              </h1>
+              <p className="text-gray-600">Vui lòng đợi trong giây lát</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

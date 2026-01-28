@@ -1,9 +1,17 @@
-'use client'
-import React, { useState, useEffect } from 'react';
+'use client';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Eye, EyeOff, Briefcase, CheckCircle, ShieldCheck, Lock } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Briefcase,
+  CheckCircle,
+  ShieldCheck,
+  Lock,
+} from 'lucide-react';
 
-export default function ResetPasswordPage() {
+// Separate the component that uses useSearchParams
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -11,7 +19,7 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [errors, setErrors] = useState({});
   const [token, setToken] = useState('');
@@ -19,7 +27,10 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const resetToken = searchParams.get('token');
     if (!resetToken) {
-      setErrors({ general: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.' });
+      setErrors({
+        general:
+          'Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.',
+      });
     } else {
       setToken(resetToken);
     }
@@ -45,7 +56,9 @@ export default function ResetPasswordPage() {
     const newErrors = validateForm();
 
     if (!token) {
-      setErrors({ general: 'Token không hợp lệ. Vui lòng yêu cầu đặt lại mật khẩu mới.' });
+      setErrors({
+        general: 'Token không hợp lệ. Vui lòng yêu cầu đặt lại mật khẩu mới.',
+      });
       return;
     }
 
@@ -58,16 +71,19 @@ export default function ResetPasswordPage() {
     setErrors({});
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          newPassword: formData.password
-        }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token,
+            newPassword: formData.password,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -75,7 +91,10 @@ export default function ResetPasswordPage() {
         alert('Đặt lại mật khẩu thành công! Chuyển đến trang đăng nhập...');
         router.push('/login');
       } else {
-        setErrors({ general: data.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.' });
+        setErrors({
+          general:
+            data.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.',
+        });
       }
     } catch (error) {
       console.error('Reset password error:', error);
@@ -89,7 +108,7 @@ export default function ResetPasswordPage() {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: value,
     });
 
     if (errors[name]) {
@@ -116,7 +135,8 @@ export default function ResetPasswordPage() {
     if (/[^a-zA-Z\d]/.test(password)) strength++;
 
     if (strength <= 2) return { strength, text: 'Yếu', color: 'bg-red-500' };
-    if (strength <= 3) return { strength, text: 'Trung bình', color: 'bg-yellow-500' };
+    if (strength <= 3)
+      return { strength, text: 'Trung bình', color: 'bg-yellow-500' };
     return { strength, text: 'Mạnh', color: 'bg-green-500' };
   };
 
@@ -151,7 +171,10 @@ export default function ResetPasswordPage() {
 
             {/* New Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Mật khẩu mới
               </label>
               <div className="relative">
@@ -180,10 +203,14 @@ export default function ResetPasswordPage() {
                     <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${passwordStrength.color} transition-all`}
-                        style={{ width: `${(passwordStrength.strength / 5) * 100}%` }}
+                        style={{
+                          width: `${(passwordStrength.strength / 5) * 100}%`,
+                        }}
                       ></div>
                     </div>
-                    <span className="text-xs text-gray-600">{passwordStrength.text}</span>
+                    <span className="text-xs text-gray-600">
+                      {passwordStrength.text}
+                    </span>
                   </div>
                 </div>
               )}
@@ -194,7 +221,10 @@ export default function ResetPasswordPage() {
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Xác nhận mật khẩu
               </label>
               <div className="relative">
@@ -214,32 +244,48 @@ export default function ResetPasswordPage() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
-                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showConfirmPassword ? (
+                    <EyeOff size={20} />
+                  ) : (
+                    <Eye size={20} />
+                  )}
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>
+                <p className="mt-1 text-sm text-red-500">
+                  {errors.confirmPassword}
+                </p>
               )}
             </div>
 
             {/* Password Requirements */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Yêu cầu mật khẩu:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Yêu cầu mật khẩu:
+              </p>
               <ul className="space-y-1 text-sm text-gray-600">
                 <li className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${formData.password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${formData.password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}
+                  ></div>
                   Ít nhất 8 ký tự
                 </li>
                 <li className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${/[A-Z]/.test(formData.password) && /[a-z]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${/[A-Z]/.test(formData.password) && /[a-z]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}
+                  ></div>
                   Kết hợp chữ hoa và chữ thường
                 </li>
                 <li className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${/\d/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${/\d/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}
+                  ></div>
                   Ít nhất một số
                 </li>
                 <li className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${/[^a-zA-Z\d]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${/[^a-zA-Z\d]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`}
+                  ></div>
                   Ký tự đặc biệt (!@#$%^&*)
                 </li>
               </ul>
@@ -253,9 +299,25 @@ export default function ResetPasswordPage() {
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Đang xử lý...
                 </>
@@ -268,7 +330,10 @@ export default function ResetPasswordPage() {
           {/* Back to Login Link */}
           <p className="mt-8 text-center text-sm text-gray-600">
             Nhớ mật khẩu?{' '}
-            <a href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <a
+              href="/login"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               Đăng nhập ngay
             </a>
           </p>
@@ -278,11 +343,10 @@ export default function ResetPasswordPage() {
       {/* Right Side - Security Features */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 items-center justify-center">
         <div className="max-w-lg text-white">
-          <h2 className="text-4xl font-bold mb-6">
-            Bảo mật tài khoản của bạn
-          </h2>
+          <h2 className="text-4xl font-bold mb-6">Bảo mật tài khoản của bạn</h2>
           <p className="text-blue-100 text-lg mb-12">
-            Chúng tôi cam kết bảo vệ thông tin và dữ liệu của bạn với các tiêu chuẩn bảo mật cao nhất.
+            Chúng tôi cam kết bảo vệ thông tin và dữ liệu của bạn với các tiêu
+            chuẩn bảo mật cao nhất.
           </p>
 
           <div className="space-y-6">
@@ -293,7 +357,8 @@ export default function ResetPasswordPage() {
               <div>
                 <h3 className="font-semibold text-lg mb-1">Mã hóa đầu cuối</h3>
                 <p className="text-blue-100">
-                  Dữ liệu của bạn được mã hóa với chuẩn AES-256, đảm bảo an toàn tuyệt đối
+                  Dữ liệu của bạn được mã hóa với chuẩn AES-256, đảm bảo an toàn
+                  tuyệt đối
                 </p>
               </div>
             </div>
@@ -303,7 +368,9 @@ export default function ResetPasswordPage() {
                 <Lock className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-1">Xác thực hai yếu tố</h3>
+                <h3 className="font-semibold text-lg mb-1">
+                  Xác thực hai yếu tố
+                </h3>
                 <p className="text-blue-100">
                   Tăng cường bảo mật với xác thực 2FA cho tài khoản của bạn
                 </p>
@@ -315,9 +382,12 @@ export default function ResetPasswordPage() {
                 <CheckCircle className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-1">Tuân thủ tiêu chuẩn</h3>
+                <h3 className="font-semibold text-lg mb-1">
+                  Tuân thủ tiêu chuẩn
+                </h3>
                 <p className="text-blue-100">
-                  Đạt chứng nhận ISO 27001, GDPR và các tiêu chuẩn bảo mật quốc tế
+                  Đạt chứng nhận ISO 27001, GDPR và các tiêu chuẩn bảo mật quốc
+                  tế
                 </p>
               </div>
             </div>
@@ -344,5 +414,42 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <svg
+              className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <p className="text-gray-600">Đang tải...</p>
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
