@@ -18,16 +18,15 @@ export default function PieChart({ data, title, size = 200 }) {
     '#8b5cf6', // purple
     '#ec4899', // pink
     '#06b6d4', // cyan
-    '#f97316'  // orange-500
+    '#f97316', // orange-500
   ];
 
-  let currentAngle = -90;
-  const segments = data.map((item, index) => {
+  const segments = data.reduce((acc, item, index) => {
     const percentage = (item.value / total) * 100;
     const angle = (percentage / 100) * 360;
+    const currentAngle = acc.length === 0 ? -90 : acc[acc.length - 1].endAngle;
     const startAngle = currentAngle;
     const endAngle = currentAngle + angle;
-    currentAngle = endAngle;
 
     const startX = 50 + 40 * Math.cos((startAngle * Math.PI) / 180);
     const startY = 50 + 40 * Math.sin((startAngle * Math.PI) / 180);
@@ -36,19 +35,28 @@ export default function PieChart({ data, title, size = 200 }) {
 
     const largeArcFlag = angle > 180 ? 1 : 0;
 
-    return {
+    acc.push({
       path: `M 50 50 L ${startX} ${startY} A 40 40 0 ${largeArcFlag} 1 ${endX} ${endY} Z`,
       color: colors[index % colors.length],
-      percentage: percentage.toFixed(1)
-    };
-  });
+      percentage: percentage.toFixed(1),
+      endAngle,
+    });
+    return acc;
+  }, []);
 
   return (
     <div>
-      {title && <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>}
+      {title && (
+        <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
+      )}
       <div className="flex items-center justify-center gap-8">
         {/* Pie Chart */}
-        <svg width={size} height={size} viewBox="0 0 100 100" className="transform -rotate-90">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 100 100"
+          className="transform -rotate-90"
+        >
           {segments.map((segment, index) => (
             <path
               key={index}

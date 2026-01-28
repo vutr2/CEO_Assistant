@@ -12,7 +12,7 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 export default function ExpensesPage() {
@@ -48,7 +48,7 @@ export default function ExpensesPage() {
       setLoading(true);
       const [expensesRes, statsRes] = await Promise.all([
         expensesAPI.getAll({ limit: 50 }),
-        expensesAPI.getStats()
+        expensesAPI.getStats(),
       ]);
       setExpenses(expensesRes.data || []);
       setStats(statsRes.data || null);
@@ -64,7 +64,7 @@ export default function ExpensesPage() {
     try {
       const dataToSend = {
         ...formData,
-        amount: parseFloat(formData.amount)
+        amount: parseFloat(formData.amount),
       };
 
       if (editingExpense) {
@@ -137,7 +137,10 @@ export default function ExpensesPage() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
   };
 
   const getCategoryLabel = (category) => {
@@ -162,14 +165,32 @@ export default function ExpensesPage() {
   const getStatusBadge = (status) => {
     const config = {
       draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-800', icon: Clock },
-      submitted: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      rejected: { label: 'Từ chối', color: 'bg-red-100 text-red-800', icon: XCircle },
-      paid: { label: 'Đã thanh toán', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
+      submitted: {
+        label: 'Chờ duyệt',
+        color: 'bg-yellow-100 text-yellow-800',
+        icon: Clock,
+      },
+      approved: {
+        label: 'Đã duyệt',
+        color: 'bg-green-100 text-green-800',
+        icon: CheckCircle,
+      },
+      rejected: {
+        label: 'Từ chối',
+        color: 'bg-red-100 text-red-800',
+        icon: XCircle,
+      },
+      paid: {
+        label: 'Đã thanh toán',
+        color: 'bg-blue-100 text-blue-800',
+        icon: CheckCircle,
+      },
     };
     const { label, color, icon: Icon } = config[status] || config.submitted;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}
+      >
         <Icon className="w-3 h-3" />
         {label}
       </span>
@@ -184,7 +205,11 @@ export default function ExpensesPage() {
       urgent: { label: 'Khẩn cấp', color: 'bg-red-100 text-red-600' },
     };
     const { label, color } = config[priority] || config.medium;
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>{label}</span>;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+        {label}
+      </span>
+    );
   };
 
   if (loading) {
@@ -204,7 +229,11 @@ export default function ExpensesPage() {
           <p className="text-gray-600">Theo dõi và báo cáo các khoản chi phí</p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditingExpense(null); resetForm(); }}
+          onClick={() => {
+            setShowForm(true);
+            setEditingExpense(null);
+            resetForm();
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-5 h-5" />
@@ -222,7 +251,9 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Tổng chi phí</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.overview?.totalExpenses || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.overview?.totalExpenses || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -233,7 +264,9 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Đã duyệt</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.overview?.approvedExpenses || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.overview?.approvedExpenses || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -244,7 +277,9 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Chờ duyệt</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.overview?.pendingExpenses || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.overview?.pendingExpenses || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -255,7 +290,9 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Số lượng</p>
-                <p className="text-xl font-bold">{stats.overview?.totalCount || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.totalCount || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -268,20 +305,37 @@ export default function ExpensesPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi phí</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Danh mục</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ưu tiên</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Chi phí
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Danh mục
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Số tiền
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Ưu tiên
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Ngày
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {expenses.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                    Chưa có chi phí nào. Bấm "Thêm chi phí" để bắt đầu.
+                  <td
+                    colSpan="7"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
+                    Chưa có chi phí nào. Bấm Thêm chi phí để bắt đầu.
                   </td>
                 </tr>
               ) : (
@@ -289,8 +343,12 @@ export default function ExpensesPage() {
                   <tr key={expense._id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium text-gray-900">{expense.title}</p>
-                        <p className="text-sm text-gray-500">{expense.vendor}</p>
+                        <p className="font-medium text-gray-900">
+                          {expense.title}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {expense.vendor}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
@@ -306,28 +364,31 @@ export default function ExpensesPage() {
                       {getPriorityBadge(expense.priority)}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {new Date(expense.expenseDate).toLocaleDateString('vi-VN')}
+                      {new Date(expense.expenseDate).toLocaleDateString(
+                        'vi-VN'
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        {expense.status !== 'approved' && expense.status !== 'paid' && (
-                          <>
-                            <button
-                              onClick={() => handleEdit(expense)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                              title="Sửa"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(expense._id)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                        {expense.status !== 'approved' &&
+                          expense.status !== 'paid' && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(expense)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Sửa"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(expense._id)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -355,7 +416,9 @@ export default function ExpensesPage() {
                     type="text"
                     required
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Mua văn phòng phẩm tháng 1"
                   />
@@ -366,7 +429,9 @@ export default function ExpensesPage() {
                   </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="office_supplies">Văn phòng phẩm</option>
@@ -396,7 +461,9 @@ export default function ExpensesPage() {
                     required
                     min="0"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
@@ -408,7 +475,9 @@ export default function ExpensesPage() {
                   <input
                     type="date"
                     value={formData.expenseDate}
-                    onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, expenseDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -422,7 +491,9 @@ export default function ExpensesPage() {
                   <input
                     type="text"
                     value={formData.vendor}
-                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, vendor: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Tên nhà cung cấp"
                   />
@@ -434,7 +505,9 @@ export default function ExpensesPage() {
                   <input
                     type="text"
                     value={formData.vendorPhone}
-                    onChange={(e) => setFormData({ ...formData, vendorPhone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, vendorPhone: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -445,7 +518,12 @@ export default function ExpensesPage() {
                   <input
                     type="text"
                     value={formData.receiptNumber}
-                    onChange={(e) => setFormData({ ...formData, receiptNumber: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        receiptNumber: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -458,7 +536,12 @@ export default function ExpensesPage() {
                   </label>
                   <select
                     value={formData.paymentMethod}
-                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        paymentMethod: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="cash">Tiền mặt</option>
@@ -475,7 +558,12 @@ export default function ExpensesPage() {
                   </label>
                   <select
                     value={formData.paymentStatus}
-                    onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        paymentStatus: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="pending">Chưa thanh toán</option>
@@ -489,7 +577,9 @@ export default function ExpensesPage() {
                   </label>
                   <select
                     value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, priority: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="low">Thấp</option>
@@ -505,7 +595,12 @@ export default function ExpensesPage() {
                   <input
                     type="checkbox"
                     checked={formData.isReimbursable}
-                    onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        isReimbursable: e.target.checked,
+                      })
+                    }
                     className="rounded border-gray-300"
                   />
                   <span className="text-sm text-gray-700">Có thể hoàn trả</span>
@@ -514,10 +609,17 @@ export default function ExpensesPage() {
                   <input
                     type="checkbox"
                     checked={formData.isTaxDeductible}
-                    onChange={(e) => setFormData({ ...formData, isTaxDeductible: e.target.checked })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        isTaxDeductible: e.target.checked,
+                      })
+                    }
                     className="rounded border-gray-300"
                   />
-                  <span className="text-sm text-gray-700">Được khấu trừ thuế</span>
+                  <span className="text-sm text-gray-700">
+                    Được khấu trừ thuế
+                  </span>
                 </label>
               </div>
 
@@ -527,7 +629,9 @@ export default function ExpensesPage() {
                 </label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notes: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Ghi chú thêm..."
@@ -537,7 +641,10 @@ export default function ExpensesPage() {
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setEditingExpense(null); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingExpense(null);
+                  }}
                   className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
                 >
                   Hủy

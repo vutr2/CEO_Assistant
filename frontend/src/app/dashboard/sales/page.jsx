@@ -14,7 +14,7 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
 } from 'lucide-react';
 
 export default function SalesPage() {
@@ -47,7 +47,7 @@ export default function SalesPage() {
       setLoading(true);
       const [salesRes, statsRes] = await Promise.all([
         salesAPI.getAll({ limit: 50 }),
-        salesAPI.getStats()
+        salesAPI.getStats(),
       ]);
       setSales(salesRes.data || []);
       setStats(statsRes.data || null);
@@ -63,7 +63,7 @@ export default function SalesPage() {
     try {
       const dataToSend = {
         ...formData,
-        amount: parseFloat(formData.amount)
+        amount: parseFloat(formData.amount),
       };
 
       if (editingSale) {
@@ -130,30 +130,60 @@ export default function SalesPage() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
   };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
       lead: { label: 'Tiềm năng', color: 'bg-gray-100 text-gray-800' },
       contacted: { label: 'Đã liên hệ', color: 'bg-blue-100 text-blue-800' },
-      negotiating: { label: 'Đang đàm phán', color: 'bg-yellow-100 text-yellow-800' },
+      negotiating: {
+        label: 'Đang đàm phán',
+        color: 'bg-yellow-100 text-yellow-800',
+      },
       won: { label: 'Thành công', color: 'bg-green-100 text-green-800' },
       lost: { label: 'Thất bại', color: 'bg-red-100 text-red-800' },
     };
     const config = statusConfig[status] || statusConfig.lead;
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}
+      >
+        {config.label}
+      </span>
+    );
   };
 
   const getApprovalBadge = (approvalStatus) => {
     const config = {
-      pending: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      rejected: { label: 'Từ chối', color: 'bg-red-100 text-red-800', icon: XCircle },
+      pending: {
+        label: 'Chờ duyệt',
+        color: 'bg-yellow-100 text-yellow-800',
+        icon: Clock,
+      },
+      approved: {
+        label: 'Đã duyệt',
+        color: 'bg-green-100 text-green-800',
+        icon: CheckCircle,
+      },
+      rejected: {
+        label: 'Từ chối',
+        color: 'bg-red-100 text-red-800',
+        icon: XCircle,
+      },
     };
-    const { label, color, icon: Icon } = config[approvalStatus] || config.pending;
+    const {
+      label,
+      color,
+      icon: Icon,
+    } = config[approvalStatus] || config.pending;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}
+      >
         <Icon className="w-3 h-3" />
         {label}
       </span>
@@ -174,10 +204,16 @@ export default function SalesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quản lý Bán hàng</h1>
-          <p className="text-gray-600">Theo dõi và quản lý các giao dịch bán hàng</p>
+          <p className="text-gray-600">
+            Theo dõi và quản lý các giao dịch bán hàng
+          </p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditingSale(null); resetForm(); }}
+          onClick={() => {
+            setShowForm(true);
+            setEditingSale(null);
+            resetForm();
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-5 h-5" />
@@ -195,7 +231,9 @@ export default function SalesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Tổng doanh thu</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.overview?.totalRevenue || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.overview?.totalRevenue || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -206,7 +244,9 @@ export default function SalesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Deals thành công</p>
-                <p className="text-xl font-bold">{stats.overview?.wonDeals || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.wonDeals || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -217,7 +257,9 @@ export default function SalesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Tổng giao dịch</p>
-                <p className="text-xl font-bold">{stats.overview?.totalSales || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.totalSales || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -228,7 +270,9 @@ export default function SalesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Giá trị TB</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.overview?.avgSaleValue || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.overview?.avgSaleValue || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -241,20 +285,37 @@ export default function SalesPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giao dịch</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phê duyệt</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Giao dịch
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Khách hàng
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Số tiền
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Phê duyệt
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Ngày
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sales.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                    Chưa có giao dịch nào. Bấm "Thêm giao dịch" để bắt đầu.
+                  <td
+                    colSpan="7"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
+                    Chưa có giao dịch nào. Bấm Thêm giao dịch để bắt đầu.
                   </td>
                 </tr>
               ) : (
@@ -262,22 +323,24 @@ export default function SalesPage() {
                   <tr key={sale._id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium text-gray-900">{sale.title}</p>
+                        <p className="font-medium text-gray-900">
+                          {sale.title}
+                        </p>
                         <p className="text-sm text-gray-500">{sale.category}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-gray-900">{sale.customerName}</p>
-                        <p className="text-sm text-gray-500">{sale.customerPhone || sale.customerEmail}</p>
+                        <p className="text-sm text-gray-500">
+                          {sale.customerPhone || sale.customerEmail}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {formatCurrency(sale.amount)}
                     </td>
-                    <td className="px-4 py-3">
-                      {getStatusBadge(sale.status)}
-                    </td>
+                    <td className="px-4 py-3">{getStatusBadge(sale.status)}</td>
                     <td className="px-4 py-3">
                       {getApprovalBadge(sale.approvalStatus)}
                     </td>
@@ -327,7 +390,9 @@ export default function SalesPage() {
                     type="text"
                     required
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Bán gói Premium cho ABC Corp"
                   />
@@ -340,7 +405,9 @@ export default function SalesPage() {
                     type="text"
                     required
                     value={formData.customerName}
-                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, customerName: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Tên khách hàng"
                   />
@@ -355,7 +422,12 @@ export default function SalesPage() {
                   <input
                     type="email"
                     value={formData.customerEmail}
-                    onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customerEmail: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -366,7 +438,12 @@ export default function SalesPage() {
                   <input
                     type="text"
                     value={formData.customerPhone}
-                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customerPhone: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -382,7 +459,9 @@ export default function SalesPage() {
                     required
                     min="0"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
@@ -394,7 +473,9 @@ export default function SalesPage() {
                   <input
                     type="date"
                     value={formData.saleDate}
-                    onChange={(e) => setFormData({ ...formData, saleDate: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, saleDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -407,7 +488,9 @@ export default function SalesPage() {
                   </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="product">Sản phẩm</option>
@@ -422,7 +505,9 @@ export default function SalesPage() {
                   </label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="lead">Tiềm năng</option>
@@ -438,7 +523,9 @@ export default function SalesPage() {
                   </label>
                   <select
                     value={formData.source}
-                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, source: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="website">Website</option>
@@ -459,7 +546,12 @@ export default function SalesPage() {
                   </label>
                   <select
                     value={formData.paymentStatus}
-                    onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        paymentStatus: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="pending">Chưa thanh toán</option>
@@ -473,7 +565,12 @@ export default function SalesPage() {
                   </label>
                   <select
                     value={formData.paymentMethod}
-                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        paymentMethod: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="cash">Tiền mặt</option>
@@ -491,7 +588,9 @@ export default function SalesPage() {
                 </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Ghi chú thêm..."
@@ -501,7 +600,10 @@ export default function SalesPage() {
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setEditingSale(null); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingSale(null);
+                  }}
                   className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
                 >
                   Hủy

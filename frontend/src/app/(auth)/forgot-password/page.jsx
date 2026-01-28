@@ -241,7 +241,7 @@ export default function ForgotPasswordPage() {
                     {/* Support Info */}
                     <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
                         <div className="flex items-start space-x-3">
-                            <SmartPhone className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                            <Smartphone className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                             <div className="text-sm text-yellow-900">
                                 <p className="font-medium mb-1">Không nhận được email?</p>
                                 <p className="text-yellow-700">
