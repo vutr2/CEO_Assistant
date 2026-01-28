@@ -14,7 +14,7 @@ import {
   Play,
   Pause,
   Target,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react';
 
 export default function ActivitiesPage() {
@@ -45,7 +45,7 @@ export default function ActivitiesPage() {
       setLoading(true);
       const [activitiesRes, statsRes] = await Promise.all([
         activitiesAPI.getAll({ limit: 50 }),
-        activitiesAPI.getStats()
+        activitiesAPI.getStats(),
       ]);
       setActivities(activitiesRes.data || []);
       setStats(statsRes.data || null);
@@ -62,7 +62,9 @@ export default function ActivitiesPage() {
       const dataToSend = {
         ...formData,
         duration: formData.duration ? parseInt(formData.duration) : undefined,
-        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
+        tags: formData.tags
+          ? formData.tags.split(',').map((t) => t.trim())
+          : [],
       };
 
       if (editingActivity) {
@@ -89,8 +91,12 @@ export default function ActivitiesPage() {
       type: activity.type,
       priority: activity.priority,
       status: activity.status,
-      startTime: activity.startTime ? new Date(activity.startTime).toISOString().slice(0, 16) : '',
-      endTime: activity.endTime ? new Date(activity.endTime).toISOString().slice(0, 16) : '',
+      startTime: activity.startTime
+        ? new Date(activity.startTime).toISOString().slice(0, 16)
+        : '',
+      endTime: activity.endTime
+        ? new Date(activity.endTime).toISOString().slice(0, 16)
+        : '',
       duration: activity.duration?.toString() || '',
       tags: activity.tags?.join(', ') || '',
       notes: activity.notes || '',
@@ -152,14 +158,32 @@ export default function ActivitiesPage() {
 
   const getStatusBadge = (status) => {
     const config = {
-      pending: { label: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      in_progress: { label: 'Đang làm', color: 'bg-blue-100 text-blue-800', icon: Play },
-      completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      cancelled: { label: 'Hủy bỏ', color: 'bg-red-100 text-red-800', icon: XCircle },
+      pending: {
+        label: 'Chờ xử lý',
+        color: 'bg-yellow-100 text-yellow-800',
+        icon: Clock,
+      },
+      in_progress: {
+        label: 'Đang làm',
+        color: 'bg-blue-100 text-blue-800',
+        icon: Play,
+      },
+      completed: {
+        label: 'Hoàn thành',
+        color: 'bg-green-100 text-green-800',
+        icon: CheckCircle,
+      },
+      cancelled: {
+        label: 'Hủy bỏ',
+        color: 'bg-red-100 text-red-800',
+        icon: XCircle,
+      },
     };
     const { label, color, icon: Icon } = config[status] || config.pending;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}
+      >
         <Icon className="w-3 h-3" />
         {label}
       </span>
@@ -174,7 +198,11 @@ export default function ActivitiesPage() {
       urgent: { label: 'Khẩn cấp', color: 'bg-red-100 text-red-600' },
     };
     const { label, color } = config[priority] || config.medium;
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>{label}</span>;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+        {label}
+      </span>
+    );
   };
 
   const formatDuration = (minutes) => {
@@ -200,11 +228,19 @@ export default function ActivitiesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Hoạt động hàng ngày</h1>
-          <p className="text-gray-600">Ghi nhận và theo dõi các hoạt động làm việc</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Hoạt động hàng ngày
+          </h1>
+          <p className="text-gray-600">
+            Ghi nhận và theo dõi các hoạt động làm việc
+          </p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditingActivity(null); resetForm(); }}
+          onClick={() => {
+            setShowForm(true);
+            setEditingActivity(null);
+            resetForm();
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-5 h-5" />
@@ -222,7 +258,9 @@ export default function ActivitiesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Tổng hoạt động</p>
-                <p className="text-xl font-bold">{stats.overview?.totalActivities || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.totalActivities || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -233,7 +271,9 @@ export default function ActivitiesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Đã hoàn thành</p>
-                <p className="text-xl font-bold">{stats.overview?.completedActivities || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.completedActivities || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -244,7 +284,9 @@ export default function ActivitiesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Đang thực hiện</p>
-                <p className="text-xl font-bold">{stats.overview?.inProgressActivities || 0}</p>
+                <p className="text-xl font-bold">
+                  {stats.overview?.inProgressActivities || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -255,7 +297,9 @@ export default function ActivitiesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Tổng thời gian</p>
-                <p className="text-xl font-bold">{formatDuration(stats.overview?.totalDuration || 0)}</p>
+                <p className="text-xl font-bold">
+                  {formatDuration(stats.overview?.totalDuration || 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -268,19 +312,34 @@ export default function ActivitiesPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hoạt động</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ưu tiên</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Hoạt động
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Loại
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thời gian
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Ưu tiên
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {activities.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                    Chưa có hoạt động nào. Bấm "Thêm hoạt động" để bắt đầu.
+                  <td
+                    colSpan="6"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
+                    Chưa có hoạt động nào. Bấm Thêm hoạt động để bắt đầu.
                   </td>
                 </tr>
               ) : (
@@ -294,8 +353,12 @@ export default function ActivitiesPage() {
                             <TypeIcon className="w-4 h-4 text-gray-600" />
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{activity.title}</p>
-                            <p className="text-sm text-gray-500 line-clamp-1">{activity.description}</p>
+                            <p className="font-medium text-gray-900">
+                              {activity.title}
+                            </p>
+                            <p className="text-sm text-gray-500 line-clamp-1">
+                              {activity.description}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -355,7 +418,9 @@ export default function ActivitiesPage() {
                     type="text"
                     required
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Họp team buổi sáng"
                   />
@@ -366,7 +431,9 @@ export default function ActivitiesPage() {
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, type: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="task">Công việc</option>
@@ -388,7 +455,9 @@ export default function ActivitiesPage() {
                   <input
                     type="datetime-local"
                     value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -399,7 +468,9 @@ export default function ActivitiesPage() {
                   <input
                     type="datetime-local"
                     value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -411,7 +482,9 @@ export default function ActivitiesPage() {
                     type="number"
                     min="0"
                     value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, duration: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 30"
                   />
@@ -425,7 +498,9 @@ export default function ActivitiesPage() {
                   </label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="pending">Chờ xử lý</option>
@@ -440,7 +515,9 @@ export default function ActivitiesPage() {
                   </label>
                   <select
                     value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, priority: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="low">Thấp</option>
@@ -458,7 +535,9 @@ export default function ActivitiesPage() {
                 <input
                   type="text"
                   value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tags: e.target.value })
+                  }
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: dự án A, khách hàng, quan trọng"
                 />
@@ -470,7 +549,9 @@ export default function ActivitiesPage() {
                 </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Chi tiết về hoạt động..."
@@ -483,7 +564,9 @@ export default function ActivitiesPage() {
                 </label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notes: e.target.value })
+                  }
                   rows={2}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Ghi chú thêm..."
@@ -493,7 +576,10 @@ export default function ActivitiesPage() {
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setEditingActivity(null); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingActivity(null);
+                  }}
                   className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
                 >
                   Hủy
