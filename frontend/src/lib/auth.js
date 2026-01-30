@@ -193,9 +193,11 @@ export const hasAnyRole = (roles) => {
  * @param {object} authData - Authentication data (token, refreshToken, user)
  */
 export const saveAuthData = (authData) => {
-  const { token, refreshToken, user } = authData;
+  // Support both "token" and "accessToken" field names for compatibility
+  const { token, accessToken, refreshToken, user } = authData;
+  const authToken = token || accessToken;
 
-  if (token) setToken(token);
+  if (authToken) setToken(authToken);
   if (refreshToken) setRefreshToken(refreshToken);
   if (user) setUser(user);
 };

@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const usersController = require('./users.controller');
+const { authenticate } = require('../../middlewares/auth');
+
+// Apply authentication to all user routes
+router.use(authenticate);
 
 // User Routes
 router.get('/profile', usersController.getProfile);
