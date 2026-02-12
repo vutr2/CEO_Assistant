@@ -60,7 +60,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <a
-              href="/"
+              href="/dashboard"
               className="px-4 py-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
             >
               ← Quay lại Dashboard
@@ -82,7 +82,9 @@ export default function SettingsPage() {
                 <h2 className="text-xl font-display font-bold text-white">
                   {user?.name || 'Người dùng'}
                 </h2>
-                <p className="text-[#a0a0b8]">{user?.email || 'email@example.com'}</p>
+                <p className="text-[#a0a0b8]">
+                  {user?.email || 'email@example.com'}
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 rounded-lg bg-[#1a1a2e] border border-[#2a2a3e] text-white hover:bg-[#2a2a3e] transition-all">
@@ -251,9 +253,7 @@ export default function SettingsPage() {
               <div className="flex items-center space-x-3">
                 <Shield className="w-5 h-5 text-[#d4af37]" />
                 <div>
-                  <p className="text-white font-medium">
-                    Xác thực hai yếu tố
-                  </p>
+                  <p className="text-white font-medium">Xác thực hai yếu tố</p>
                   <p className="text-[#6b6b80] text-sm">
                     Tăng cường bảo mật tài khoản
                   </p>

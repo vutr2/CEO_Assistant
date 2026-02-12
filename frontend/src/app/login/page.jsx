@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Descope } from '@descope/react-sdk';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@descope/react-sdk';
@@ -9,31 +9,47 @@ import { Sparkles, TrendingUp, Shield, Zap } from 'lucide-react';
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isSessionLoading } = useSession();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && !isSessionLoading) {
-      router.push('/');
+    // Only redirect if authenticated and not loading
+    if (isAuthenticated && !isSessionLoading && !isRedirecting) {
+      console.log('User is authenticated, redirecting to dashboard...');
+      setIsRedirecting(true);
+      // Use window.location for a hard redirect to avoid React state issues
+      window.location.href = '/dashboard';
     }
-  }, [isAuthenticated, isSessionLoading, router]);
+  }, [isAuthenticated, isSessionLoading, isRedirecting]);
 
   const handleSuccess = (e) => {
     console.log('Login successful:', e.detail.user);
-    router.push('/');
+    setIsRedirecting(true);
+    // Use window.location for a hard redirect
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 500);
   };
 
   const handleError = (e) => {
     console.error('Login error:', e.detail.error);
   };
 
-  if (isSessionLoading) {
+  if (isSessionLoading || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] via-[#14141f] to-[#1a1a2e]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#d4af37] mx-auto mb-4"></div>
-          <p className="text-[#a0a0b8] font-display">Đang tải...</p>
+          <p className="text-[#a0a0b8] font-display">
+            {isRedirecting ? 'Đang chuyển hướng...' : 'Đang tải...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // Don't render login form if already authenticated
+  if (isAuthenticated) {
+    return null;
   }
 
   return (

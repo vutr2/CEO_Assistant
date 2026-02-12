@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import Link from 'next/link';
 import {
   TrendingUp,
   TrendingDown,
@@ -16,6 +18,10 @@ import {
   BarChart3,
   Activity,
   Sparkles,
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
 } from 'lucide-react';
 import {
   LineChart,
@@ -45,9 +51,10 @@ import {
   generateMockData,
   generateMockSummary,
   generateMockAlerts,
-} from '../lib/api';
+} from '../../lib/api';
 
 export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [summary, setSummary] = useState(null);
   const [trends, setTrends] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -58,10 +65,23 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [period, setPeriod] = useState(30);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
   }, [period]);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProfileMenu && !event.target.closest('.profile-menu')) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileMenu]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -175,12 +195,65 @@ export default function Dashboard() {
 
             {/* User Menu */}
             <div className="flex items-center space-x-4">
+              {/* Notifications */}
               <button className="relative p-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all">
                 <Bell className="w-5 h-5" />
                 {alerts.filter((a) => !a.isRead).length > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                 )}
               </button>
+
+              {/* Profile Dropdown */}
+              <div className="relative profile-menu">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center space-x-2 p-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d4af37] to-[#c19a6b] flex items-center justify-center text-sm font-bold text-[#0a0a0f]">
+                    {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  </div>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {/* Dropdown Menu */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] shadow-xl shadow-black/50 overflow-hidden z-50">
+                    {/* User Info */}
+                    <div className="p-4 border-b border-[#2a2a3e]">
+                      <p className="text-white font-semibold truncate">
+                        {user?.name || 'User'}
+                      </p>
+                      <p className="text-[#6b6b80] text-sm truncate">
+                        {user?.email || 'email@example.com'}
+                      </p>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="py-2">
+                      <Link
+                        href="/settings"
+                        className="flex items-center space-x-3 px-4 py-3 text-[#a0a0b8] hover:text-white hover:bg-[#2a2a3e] transition-all"
+                        onClick={() => setShowProfileMenu(false)}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Settings</span>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          logout();
+                        }}
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-[#2a2a3e] transition-all"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Đăng xuất</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="md:hidden p-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e]"
