@@ -12,8 +12,14 @@ import {
 
 export async function POST(request) {
   try {
+    console.log('=== Sheets Sync API called ===');
+    console.log('SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
     // Authenticate via sync token
     const token = request.headers.get('x-sync-token');
+    console.log('Token received:', token ? token.substring(0, 8) + '...' : 'NONE');
+
     if (!token) {
       return NextResponse.json(
         { error: 'Missing x-sync-token header' },
@@ -22,9 +28,11 @@ export async function POST(request) {
     }
 
     const syncToken = await validateSyncToken(token);
+    console.log('Token validation result:', syncToken ? 'VALID (user_id: ' + syncToken.user_id + ')' : 'INVALID');
+
     if (!syncToken) {
       return NextResponse.json(
-        { error: 'Invalid or inactive sync token' },
+        { error: 'Invalid or inactive sync token. Make sure you created a token on the dashboard and it is active.' },
         { status: 401 }
       );
     }
@@ -83,7 +91,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Sheets sync error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
+      { error: 'Internal server error', message: error.message, stack: error.stack },
       { status: 500 }
     );
   }
