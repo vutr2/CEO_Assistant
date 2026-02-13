@@ -1,5 +1,10 @@
 import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import {
+  getPaymentByOrderId,
+  updatePaymentStatus,
+  updateUserPlan,
+} from '../../../../lib/supabase';
 
 const VNPAY_HASH_SECRET = process.env.VNPAY_HASH_SECRET;
 
@@ -12,7 +17,6 @@ function sortObject(obj) {
     }, {});
 }
 
-// Verify VNPay signature using raw URL query string
 function verifyVNPaySignature(url, secureHash) {
   const urlObj = new URL(url);
   const queryString = urlObj.search.slice(1);
@@ -46,13 +50,9 @@ function verifyVNPaySignature(url, secureHash) {
   return signed === secureHash;
 }
 
-// VNPay standard response format
 function vnpayResponse(code, message) {
   return NextResponse.json(
-    {
-      RspCode: String(code).padStart(2, '0'),
-      Message: message,
-    },
+    { RspCode: String(code).padStart(2, '0'), Message: message },
     { status: 200 }
   );
 }
@@ -91,69 +91,51 @@ export async function GET(request) {
       return vnpayResponse('97', 'Invalid signature');
     }
 
-    // TODO: Connect to your database to look up the order
-    // Example with a database:
-    //
-    // const payment = await db.payment.findUnique({ where: { orderId: txnRef } });
-    //
-    // if (!payment) {
-    //   console.error('[IPN] Order not found:', txnRef);
-    //   return vnpayResponse('01', 'Order not found');
-    // }
-    //
-    // if (payment.status === 'completed') {
-    //   return vnpayResponse('02', 'Order already confirmed');
-    // }
-    //
-    // if (Number(payment.amount) !== Number(amount)) {
-    //   console.error('[IPN] Amount mismatch:', { expected: payment.amount, received: amount });
-    //   return vnpayResponse('04', 'Invalid amount');
-    // }
-    //
-    // if (responseCode === '00' && transactionStatus === '00') {
-    //   // Payment succeeded
-    //   await db.payment.update({
-    //     where: { orderId: txnRef },
-    //     data: {
-    //       status: 'completed',
-    //       vnpTransactionNo: transactionNo,
-    //       vnpPayDate: vnpParams.vnp_PayDate,
-    //       vnpBankCode: vnpParams.vnp_BankCode,
-    //       vnpCardType: vnpParams.vnp_CardType,
-    //     },
-    //   });
-    //
-    //   // Update user subscription
-    //   const expiresAt = new Date();
-    //   expiresAt.setMonth(expiresAt.getMonth() + 1);
-    //
-    //   await db.user.update({
-    //     where: { id: payment.userId },
-    //     data: {
-    //       plan: payment.planId,
-    //       planExpiresAt: expiresAt,
-    //     },
-    //   });
-    // } else {
-    //   // Payment failed
-    //   await db.payment.update({
-    //     where: { orderId: txnRef },
-    //     data: {
-    //       status: 'failed',
-    //       vnpResponseCode: responseCode,
-    //       vnpTransactionStatus: transactionStatus,
-    //     },
-    //   });
-    // }
+    // Look up order in Supabase
+    const payment = await getPaymentByOrderId(txnRef);
 
-    // For now, just log and confirm
-    console.log('[IPN] Payment notification received:', {
-      txnRef,
-      responseCode,
-      transactionStatus,
-      transactionNo,
-      amount,
-    });
+    if (!payment) {
+      console.log('[IPN] Order not found in DB, confirming anyway:', txnRef);
+      return vnpayResponse('00', 'Confirm Success');
+    }
+
+    if (payment.status === 'completed') {
+      return vnpayResponse('02', 'Order already confirmed');
+    }
+
+    if (Number(payment.amount) !== Number(amount)) {
+      console.error('[IPN] Amount mismatch:', {
+        expected: payment.amount,
+        received: amount,
+      });
+      return vnpayResponse('04', 'Invalid amount');
+    }
+
+    if (responseCode === '00' && transactionStatus === '00') {
+      // Payment succeeded - update payment record
+      await updatePaymentStatus(txnRef, 'completed', {
+        vnp_transaction_no: transactionNo,
+        vnp_pay_date: vnpParams.vnp_PayDate,
+        vnp_bank_code: vnpParams.vnp_BankCode,
+        vnp_card_type: vnpParams.vnp_CardType,
+        vnp_response_code: responseCode,
+      });
+
+      // Update user plan
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+      await updateUserPlan(payment.user_id, payment.plan_id, expiresAt.toISOString());
+
+      console.log('[IPN] Payment completed:', txnRef);
+    } else {
+      // Payment failed
+      await updatePaymentStatus(txnRef, 'failed', {
+        vnp_response_code: responseCode,
+      });
+
+      console.log('[IPN] Payment failed:', txnRef, responseCode);
+    }
 
     return vnpayResponse('00', 'Confirm Success');
   } catch (error) {

@@ -22,6 +22,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  CreditCard,
 } from 'lucide-react';
 import {
   LineChart,
@@ -177,20 +178,37 @@ export default function Dashboard() {
                 { id: 'analytics', label: 'Phân tích', icon: BarChart3 },
                 { id: 'chat', label: 'AI Chat', icon: MessageSquare },
                 { id: 'alerts', label: 'Cảnh báo', icon: Bell },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-[#d4af37]/20 text-[#d4af37] shadow-lg shadow-[#d4af37]/20'
-                      : 'text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e]'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span className="font-medium">{tab.label}</span>
-                </button>
-              ))}
+                {
+                  id: 'billing',
+                  label: 'Billing',
+                  icon: CreditCard,
+                  href: '/billing',
+                },
+              ].map((tab) =>
+                tab.href ? (
+                  <Link
+                    key={tab.id}
+                    href={tab.href}
+                    className="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e]"
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    <span className="font-medium">{tab.label}</span>
+                  </Link>
+                ) : (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-[#d4af37]/20 text-[#d4af37] shadow-lg shadow-[#d4af37]/20'
+                        : 'text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e]'
+                    }`}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    <span className="font-medium">{tab.label}</span>
+                  </button>
+                )
+              )}
             </nav>
 
             {/* User Menu */}
@@ -685,7 +703,7 @@ function ChatView({ messages, input, setInput, onSubmit, isTyping }) {
                 <Sparkles className="w-16 h-16 text-[#d4af37] mx-auto mb-4" />
                 <p className="text-[#a0a0b8]">Bắt đầu cuộc trò chuyện với AI</p>
                 <p className="text-[#6b6b80] text-sm mt-2">
-                  Ví dụ: "Doanh thu hôm nay thế nào?"
+                  Ví dụ: Doanh thu hôm nay thế nào?
                 </p>
               </div>
             </div>

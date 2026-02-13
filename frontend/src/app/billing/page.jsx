@@ -1,15 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import {
-  Check,
-  Sparkles,
-  Zap,
-  Crown,
-  ArrowRight,
-  X,
-} from 'lucide-react';
+import { Check, Sparkles, Zap, Crown, ArrowRight, X } from 'lucide-react';
 
 const pricingPlans = [
   {
@@ -79,6 +72,13 @@ const pricingPlans = [
 
 export default function BillingPage() {
   const [billingCycle, setBillingCycle] = useState('monthly'); // monthly or yearly
+  const [redirectUrl, setRedirectUrl] = useState(null);
+
+  useEffect(() => {
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }, [redirectUrl]);
 
   const handleSelectPlan = (planId) => {
     if (planId === 'free') {
@@ -87,11 +87,11 @@ export default function BillingPage() {
     }
     if (planId === 'enterprise') {
       // Contact sales
-      window.location.href = 'mailto:sales@ceodashboard.com';
+      setRedirectUrl('mailto:sales@ceodashboard.com');
       return;
     }
     // Redirect to checkout
-    window.location.href = `/checkout?plan=${planId}&cycle=${billingCycle}`;
+    setRedirectUrl(`/checkout?plan=${planId}&cycle=${billingCycle}`);
   };
 
   return (

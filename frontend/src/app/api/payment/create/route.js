@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createPaymentUrl } from '../../../../lib/vnpay';
+import { createPayment, getUserByDescopeId } from '../../../../lib/supabase';
 
 export async function POST(request) {
   try {
@@ -33,8 +34,21 @@ export async function POST(request) {
       locale: 'vn',
     });
 
-    // TODO: Save order to database here
-    // await saveOrder({ orderId, userId, planId, amount, status: 'pending' });
+    // Save order to Supabase
+    try {
+      const dbUser = await getUserByDescopeId(userId);
+      if (dbUser) {
+        await createPayment({
+          userId: dbUser.id,
+          orderId,
+          planId,
+          amount,
+        });
+      }
+    } catch (dbError) {
+      // Log but don't block payment if DB fails
+      console.error('DB save error (non-blocking):', dbError.message);
+    }
 
     return NextResponse.json({
       success: true,
