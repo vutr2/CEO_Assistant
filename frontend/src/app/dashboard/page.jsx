@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Link from 'next/link';
 import {
@@ -23,6 +23,12 @@ import {
   LogOut,
   ChevronDown,
   CreditCard,
+  Link2,
+  Copy,
+  Check,
+  Trash2,
+  Plus,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   LineChart,
@@ -49,9 +55,6 @@ import {
   calculateChange,
   getTrendDirection,
   getStatusColor,
-  generateMockData,
-  generateMockSummary,
-  generateMockAlerts,
 } from '../../lib/api';
 
 export default function Dashboard() {
@@ -68,9 +71,48 @@ export default function Dashboard() {
   const [period, setPeriod] = useState(30);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const userId = user?.userId;
+      const [summaryResult, trendsResult, alertsResult] = await Promise.allSettled([
+        getDashboardSummary(userId),
+        getTrends(userId, period),
+        getAlerts(userId),
+      ]);
+
+      if (summaryResult.status === 'fulfilled') {
+        setSummary(summaryResult.value);
+      } else {
+        console.error('Failed to fetch summary:', summaryResult.reason);
+        setSummary(null);
+      }
+
+      if (trendsResult.status === 'fulfilled') {
+        setTrends(Array.isArray(trendsResult.value) ? trendsResult.value : []);
+      } else {
+        console.error('Failed to fetch trends:', trendsResult.reason);
+        setTrends([]);
+      }
+
+      if (alertsResult.status === 'fulfilled') {
+        setAlerts(Array.isArray(alertsResult.value) ? alertsResult.value : []);
+      } else {
+        console.error('Failed to fetch alerts:', alertsResult.reason);
+        setAlerts([]);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.userId, period]);
+
   useEffect(() => {
-    loadDashboardData();
-  }, [period]);
+    if (user?.userId) {
+      loadDashboardData();
+    }
+  }, [loadDashboardData, user?.userId]);
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -83,29 +125,6 @@ export default function Dashboard() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showProfileMenu]);
-
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      // TODO: Replace with real API calls
-      // const summaryData = await getDashboardSummary();
-      // const trendsData = await getTrends(period);
-      // const alertsData = await getAlerts();
-
-      // Using mock data for demo
-      const summaryData = generateMockSummary();
-      const trendsData = generateMockData();
-      const alertsData = generateMockAlerts();
-
-      setSummary(summaryData);
-      setTrends(trendsData);
-      setAlerts(alertsData);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChat = async (e) => {
     e.preventDefault();
@@ -121,19 +140,22 @@ export default function Dashboard() {
     setIsTyping(true);
 
     try {
-      // TODO: Replace with real API call
-      // const response = await chatWithAI(chatInput);
-
-      // Mock response for demo
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const userId = user?.userId;
+      const response = await chatWithAI(userId, chatInput, chatMessages);
       const aiMessage = {
         role: 'assistant',
-        content: `Dựa trên dữ liệu hiện tại, doanh thu hôm nay đạt ${formatCurrency(summary?.today?.revenue || 0)}. Đây là một kết quả tốt so với hôm qua.`,
+        content: response.message || response.output || 'Không có phản hồi từ AI.',
         timestamp: new Date(),
       };
       setChatMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
       console.error('Chat error:', error);
+      const errorMessage = {
+        role: 'assistant',
+        content: 'Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.',
+        timestamp: new Date(),
+      };
+      setChatMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
     }
@@ -178,6 +200,7 @@ export default function Dashboard() {
                 { id: 'analytics', label: 'Phân tích', icon: BarChart3 },
                 { id: 'chat', label: 'AI Chat', icon: MessageSquare },
                 { id: 'alerts', label: 'Cảnh báo', icon: Bell },
+                { id: 'sheets', label: 'Kết nối', icon: FileSpreadsheet },
                 {
                   id: 'billing',
                   label: 'Billing',
@@ -308,6 +331,7 @@ export default function Dashboard() {
           />
         )}
         {activeTab === 'alerts' && <AlertsView alerts={alerts} />}
+        {activeTab === 'sheets' && <SheetsView user={user} />}
       </main>
     </div>
   );
@@ -822,6 +846,387 @@ function AlertsView({ alerts }) {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Sheets Connection View Component
+function SheetsView({ user }) {
+  const [tokens, setTokens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [showScript, setShowScript] = useState(false);
+
+  useEffect(() => {
+    if (user?.userId) loadTokens();
+  }, [user?.userId]);
+
+  const loadTokens = async () => {
+    try {
+      const res = await fetch('/api/sync-token', {
+        headers: { 'x-user-id': user.userId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTokens(data);
+      }
+    } catch (err) {
+      console.error('Failed to load tokens:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createToken = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch('/api/sync-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.userId, email: user.email, name: user.name }),
+      });
+      if (res.ok) {
+        await loadTokens();
+      }
+    } catch (err) {
+      console.error('Failed to create token:', err);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteToken = async (tokenId) => {
+    try {
+      await fetch('/api/sync-token', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.userId, tokenId }),
+      });
+      await loadTokens();
+    } catch (err) {
+      console.error('Failed to delete token:', err);
+    }
+  };
+
+  const copyToClipboard = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const syncToken = tokens[0]?.token || 'YOUR_SYNC_TOKEN';
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+
+  const appsScriptCode = `// =============================================
+// CEO Dashboard - Google Sheets Auto Sync
+// =============================================
+// 1. Paste toàn bộ code này vào Extensions → Apps Script
+// 2. Nhấn Save (Ctrl+S)
+// 3. Chọn hàm setupTrigger → nhấn Run (▶)
+// =============================================
+
+var CONFIG = {
+  SYNC_TOKEN: '${syncToken}',
+  APP_URL: '${appUrl}',
+};
+
+var SHEET_MAP = {
+  'DonHang': 'orders',
+  'ChiPhi': 'expenses',
+  'KhoHang': 'inventory',
+  'NhanSu': 'employees',
+};
+
+function onEdit(e) {
+  var sheet = e.source.getActiveSheet();
+  var sheetName = sheet.getName();
+  if (!SHEET_MAP[sheetName]) return;
+  Utilities.sleep(2000);
+  syncSheet(sheetName);
+}
+
+function syncSheet(sheetName) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return;
+  var sheetType = SHEET_MAP[sheetName];
+  if (!sheetType) return;
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return;
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0] && !row[1]) continue;
+    var rowData = parseRow(sheetType, row, sheetName + '_' + (i + 1));
+    if (rowData) rows.push(rowData);
+  }
+  if (rows.length === 0) return;
+  try {
+    var response = UrlFetchApp.fetch(CONFIG.APP_URL + '/api/sheets/sync', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-sync-token': CONFIG.SYNC_TOKEN },
+      payload: JSON.stringify({ sheetType: sheetType, rows: rows }),
+      muteHttpExceptions: true,
+    });
+    var code = response.getResponseCode();
+    if (code === 200) {
+      SpreadsheetApp.getActiveSpreadsheet().toast('Đã đồng bộ ' + rows.length + ' dòng từ ' + sheetName, 'Sync thành công ✓', 3);
+    } else {
+      SpreadsheetApp.getActiveSpreadsheet().toast('Lỗi: ' + response.getContentText(), 'Sync thất bại ✗', 5);
+    }
+  } catch (err) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Lỗi: ' + err.message, 'Sync thất bại ✗', 5);
+  }
+}
+
+function parseRow(sheetType, row, sheetRowId) {
+  switch (sheetType) {
+    case 'orders':
+      return { date: fmtDate(row[0]), customerName: String(row[1]||''), product: String(row[2]||''), quantity: Number(row[3])||0, unitPrice: Number(row[4])||0, total: Number(row[5])||(Number(row[3])||0)*(Number(row[4])||0), status: String(row[6]||'completed'), notes: String(row[7]||''), sheetRowId: sheetRowId };
+    case 'expenses':
+      return { date: fmtDate(row[0]), category: String(row[1]||''), description: String(row[2]||''), amount: Number(row[3])||0, paidBy: String(row[4]||''), notes: String(row[5]||''), sheetRowId: sheetRowId };
+    case 'inventory':
+      return { date: fmtDate(row[0]), productName: String(row[1]||''), quantityIn: Number(row[2])||0, quantityOut: Number(row[3])||0, stockRemaining: Number(row[4])||0, notes: String(row[5]||''), sheetRowId: sheetRowId };
+    case 'employees':
+      return { employeeName: String(row[0]||''), role: String(row[1]||''), department: String(row[2]||''), salary: Number(row[3])||0, startDate: fmtDate(row[4]), status: String(row[5]||'active'), notes: String(row[6]||''), sheetRowId: sheetRowId };
+    default: return null;
+  }
+}
+
+function fmtDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return value.getFullYear() + '-' + ('0'+(value.getMonth()+1)).slice(-2) + '-' + ('0'+value.getDate()).slice(-2);
+  }
+  var parts = String(value).split('/');
+  if (parts.length === 3) return parts[2] + '-' + parts[1] + '-' + parts[0];
+  return String(value);
+}
+
+function setupTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) ScriptApp.deleteTrigger(triggers[i]);
+  ScriptApp.newTrigger('onEdit').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Auto-sync đã được bật!', 'Cài đặt thành công ✓', 5);
+}
+
+function syncAll() {
+  var names = Object.keys(SHEET_MAP);
+  for (var i = 0; i < names.length; i++) syncSheet(names[i]);
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('CEO Dashboard')
+    .addItem('Sync tất cả', 'syncAll')
+    .addItem('Cài đặt Auto-Sync', 'setupTrigger')
+    .addToUi();
+}`;
+
+  return (
+    <div className="space-y-6 animate-in">
+      <div>
+        <h2 className="text-3xl font-display font-bold text-white mb-2">
+          Kết nối Google Sheets
+        </h2>
+        <p className="text-[#a0a0b8]">
+          Nhân viên nhập dữ liệu vào Google Sheets, tự động đồng bộ lên Dashboard
+        </p>
+      </div>
+
+      {/* Step-by-step guide */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { step: '1', title: 'Tạo Sync Token', desc: 'Lấy mã kết nối bên dưới' },
+          { step: '2', title: 'Cài Google Apps Script', desc: 'Paste code vào Google Sheets' },
+          { step: '3', title: 'Nhân viên nhập liệu', desc: 'Data tự động lên Dashboard' },
+        ].map((s) => (
+          <div key={s.step} className="card-luxury rounded-2xl p-5 flex items-start space-x-4">
+            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37] font-bold text-lg shrink-0">
+              {s.step}
+            </div>
+            <div>
+              <p className="text-white font-semibold">{s.title}</p>
+              <p className="text-[#6b6b80] text-sm">{s.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sync Tokens */}
+      <div className="card-luxury rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-display font-bold text-white">Sync Tokens</h3>
+          <button
+            onClick={createToken}
+            disabled={creating}
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] font-semibold flex items-center space-x-2 hover:shadow-lg hover:shadow-[#d4af37]/30 transition-all disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{creating ? 'Đang tạo...' : 'Tạo Token mới'}</span>
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-[#6b6b80]">Đang tải...</p>
+        ) : tokens.length === 0 ? (
+          <p className="text-[#6b6b80]">{'Chưa có token nào. Nhấn "Tạo Token mới" để bắt đầu.'}</p>
+        ) : (
+          <div className="space-y-3">
+            {tokens.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between p-4 rounded-xl bg-[#0a0a0f]/50 border border-[#2a2a3e]"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Link2 className="w-4 h-4 text-[#d4af37]" />
+                    <span className="text-white font-medium">{t.label}</span>
+                  </div>
+                  <code className="text-[#a0a0b8] text-sm font-mono block truncate">
+                    {t.token}
+                  </code>
+                  {t.last_sync_at && (
+                    <p className="text-[#6b6b80] text-xs mt-1">
+                      Sync lần cuối: {new Date(t.last_sync_at).toLocaleString('vi-VN')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2 ml-4">
+                  <button
+                    onClick={() => copyToClipboard(t.token, t.id)}
+                    className="p-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
+                    title="Copy token"
+                  >
+                    {copiedId === t.id ? (
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => deleteToken(t.id)}
+                    className="p-2 rounded-lg text-[#a0a0b8] hover:text-red-400 hover:bg-[#1a1a2e] transition-all"
+                    title="Xóa token"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Google Apps Script Instructions */}
+      <div className="card-luxury rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-display font-bold text-white">
+            Hướng dẫn cài đặt Google Apps Script
+          </h3>
+          <button
+            onClick={() => setShowScript(!showScript)}
+            className="px-4 py-2 rounded-lg border border-[#2a2a3e] text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
+          >
+            {showScript ? 'Ẩn code' : 'Xem code'}
+          </button>
+        </div>
+
+        <div className="space-y-4 text-[#a0a0b8]">
+          <div className="space-y-2">
+            <p><span className="text-[#d4af37] font-semibold">Bước 1:</span> Tạo Google Sheets mới với 4 tab:</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {[
+                { name: 'DonHang', desc: 'Đơn hàng' },
+                { name: 'ChiPhi', desc: 'Chi phí' },
+                { name: 'KhoHang', desc: 'Kho hàng' },
+                { name: 'NhanSu', desc: 'Nhân sự' },
+              ].map((tab) => (
+                <div key={tab.name} className="p-3 rounded-lg bg-[#0a0a0f]/50 border border-[#2a2a3e]">
+                  <p className="text-white font-mono text-sm">{tab.name}</p>
+                  <p className="text-[#6b6b80] text-xs">{tab.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p><span className="text-[#d4af37] font-semibold">Bước 2:</span> Vào menu Extensions → Apps Script</p>
+          <p><span className="text-[#d4af37] font-semibold">Bước 3:</span> Xóa code mặc định, paste toàn bộ code bên dưới vào</p>
+          <p><span className="text-[#d4af37] font-semibold">Bước 4:</span> Thay <code className="text-[#d4af37]">YOUR_SYNC_TOKEN</code> bằng token ở trên</p>
+          <p><span className="text-[#d4af37] font-semibold">Bước 5:</span> Thay <code className="text-[#d4af37]">YOUR_APP_URL</code> bằng URL ứng dụng</p>
+          <p><span className="text-[#d4af37] font-semibold">Bước 6:</span> Chạy hàm <code className="text-[#d4af37]">setupTrigger()</code> một lần để bật auto-sync</p>
+        </div>
+
+        {showScript && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[#6b6b80] text-sm">Google Apps Script</span>
+              <button
+                onClick={() => copyToClipboard(appsScriptCode, 'script')}
+                className="px-3 py-1 rounded-lg text-xs text-[#a0a0b8] hover:text-white border border-[#2a2a3e] hover:bg-[#1a1a2e] transition-all flex items-center space-x-1"
+              >
+                {copiedId === 'script' ? (
+                  <><Check className="w-3 h-3 text-emerald-400" /><span>Đã copy!</span></>
+                ) : (
+                  <><Copy className="w-3 h-3" /><span>Copy config</span></>
+                )}
+              </button>
+            </div>
+            <pre className="p-4 rounded-xl bg-[#0a0a0f] border border-[#2a2a3e] text-sm text-[#a0a0b8] font-mono overflow-x-auto max-h-64 overflow-y-auto">
+{appsScriptCode}
+
+{`
+// Xem file đầy đủ tại:
+// google-apps-script/sync.js trong source code
+// Hoặc liên hệ admin để lấy script hoàn chỉnh`}
+            </pre>
+          </div>
+        )}
+      </div>
+
+      {/* Sheet Structure */}
+      <div className="card-luxury rounded-2xl p-6">
+        <h3 className="text-xl font-display font-bold text-white mb-4">
+          Cấu trúc các tab trong Google Sheets
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            {
+              name: 'DonHang',
+              columns: ['Ngày', 'Khách hàng', 'Sản phẩm', 'Số lượng', 'Đơn giá', 'Thành tiền', 'Trạng thái', 'Ghi chú'],
+            },
+            {
+              name: 'ChiPhi',
+              columns: ['Ngày', 'Danh mục', 'Mô tả', 'Số tiền', 'Người chi', 'Ghi chú'],
+            },
+            {
+              name: 'KhoHang',
+              columns: ['Ngày', 'Sản phẩm', 'Nhập kho', 'Xuất kho', 'Tồn kho', 'Ghi chú'],
+            },
+            {
+              name: 'NhanSu',
+              columns: ['Tên NV', 'Chức vụ', 'Phòng ban', 'Lương', 'Ngày BĐ', 'Trạng thái', 'Ghi chú'],
+            },
+          ].map((sheet) => (
+            <div key={sheet.name} className="p-4 rounded-xl bg-[#0a0a0f]/50 border border-[#2a2a3e]">
+              <div className="flex items-center space-x-2 mb-3">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <span className="text-white font-semibold font-mono">{sheet.name}</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {sheet.columns.map((col, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-1 rounded-md bg-[#1a1a2e] text-[#a0a0b8] text-xs"
+                  >
+                    {String.fromCharCode(65 + i)}: {col}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
