@@ -1260,11 +1260,11 @@ function SheetsView({ user, planStatus }) {
               {planStatus === 'pro' ? (
                 <div className="mt-2 flex items-center space-x-1.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                  <span className="text-emerald-400 text-xs font-medium">Tự động đồng bộ mỗi giờ</span>
+                  <span className="text-emerald-400 text-xs font-medium">Tự động đồng bộ mỗi ngày</span>
                 </div>
               ) : (
                 <div className="mt-2 flex items-center space-x-1.5">
-                  <span className="text-[#6b6b80] text-xs">Nâng cấp Pro để tự động đồng bộ mỗi giờ</span>
+                  <span className="text-[#6b6b80] text-xs">Nâng cấp Pro để tự động đồng bộ mỗi ngày</span>
                 </div>
               )}
             </div>
