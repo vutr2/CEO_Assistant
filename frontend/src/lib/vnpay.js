@@ -52,7 +52,6 @@ export function createPaymentUrl({
   vnp_Params['vnp_OrderType'] = 'other';
   vnp_Params['vnp_Amount'] = Math.round(amount * 100);
   vnp_Params['vnp_ReturnUrl'] = vnpayConfig.vnp_ReturnUrl;
-  vnp_Params['vnp_IpnUrl'] = vnpayConfig.vnp_IpnUrl;
   vnp_Params['vnp_IpAddr'] = ipAddr;
   vnp_Params['vnp_CreateDate'] = createDate;
 
