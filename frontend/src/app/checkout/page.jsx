@@ -21,12 +21,12 @@ const plans = {
     monthly: 199000,
     yearly: Math.round(199000 * 12 * 0.8),
     features: [
-      'Ket noi Google Sheets khong gioi han',
-      'Doc tat ca tab & cot dong',
-      'Dashboard phan tich tong quan',
-      'AI Chat hoi ve du lieu kinh doanh',
-      'Canh bao thong minh',
-      'Export bao cao PDF/Excel',
+      'Tất cả tính năng Free',
+      'AI Chat hỏi về dữ liệu kinh doanh',
+      'Cảnh báo thông minh tự động',
+      'Export báo cáo PDF/Excel',
+      'Đồng bộ tự động theo lịch',
+      'Hỗ trợ qua email ưu tiên',
     ],
   },
 };

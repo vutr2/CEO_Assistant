@@ -11,6 +11,21 @@ export async function POST(request) {
 
     const dbUser = await getOrCreateUser(userId, '', '');
 
+    // Pro plan check
+    const plan = dbUser.plan || 'free';
+    const isProActive =
+      plan === 'pro' ||
+      (plan === 'pro_cancelled' &&
+        dbUser.plan_expires_at &&
+        new Date(dbUser.plan_expires_at) > new Date());
+
+    if (!isProActive) {
+      return NextResponse.json(
+        { error: 'Cảnh báo thông minh chỉ dành cho gói Pro. Vui lòng nâng cấp.' },
+        { status: 403 },
+      );
+    }
+
     const rawAlerts = await getAlerts(dbUser.id);
 
     // Map to the shape the frontend expects

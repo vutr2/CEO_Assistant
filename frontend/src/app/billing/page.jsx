@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Check, Zap, ArrowRight, Clock, Shield, Star } from 'lucide-react';
+import { Check, X as XIcon, Zap, ArrowRight, Shield, Star, Crown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function BillingPage() {
@@ -10,7 +10,11 @@ export default function BillingPage() {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [userPlan, setUserPlan] = useState(null);
   const [daysLeft, setDaysLeft] = useState(null);
+  const [cancelled, setCancelled] = useState(false);
+  const [expiresAt, setExpiresAt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     if (!user?.userId) return;
@@ -21,30 +25,72 @@ export default function BillingPage() {
       .then((d) => {
         setUserPlan(d.plan);
         setDaysLeft(d.daysLeft);
+        setCancelled(d.cancelled || false);
+        setExpiresAt(d.expiresAt);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.userId]);
 
   const monthlyPrice = 199000;
-  const yearlyPrice = monthlyPrice * 12 * 0.8; // 20% off yearly
+  const yearlyPrice = monthlyPrice * 12 * 0.8;
   const displayPrice = billingCycle === 'yearly' ? Math.round(yearlyPrice / 12) : monthlyPrice;
 
-  const features = [
-    'Kết nối Google Sheets không giới hạn',
-    'Đọc tất cả tab & cột động',
-    'Dashboard phân tích tổng quan',
-    'Biểu đồ doanh thu, chi phí, kho hàng',
-    'AI Chat hỏi về dữ liệu kinh doanh',
-    'Cảnh báo thông minh',
-    'Đồng bộ tự động theo lịch',
-    'Export báo cáo PDF/Excel',
-    'Hỗ trợ qua email ưu tiên',
+  const freeFeatures = [
+    { text: 'Dashboard phân tích tổng quan', included: true },
+    { text: 'Kết nối Google Sheets', included: true },
+    { text: 'Biểu đồ doanh thu, chi phí', included: true },
+    { text: 'Đồng bộ dữ liệu thủ công', included: true },
+    { text: 'AI Chat hỏi về dữ liệu', included: false },
+    { text: 'Cảnh báo thông minh', included: false },
+    { text: 'Export báo cáo PDF/Excel', included: false },
+    { text: 'Hỗ trợ qua email ưu tiên', included: false },
+  ];
+
+  const proFeatures = [
+    { text: 'Tất cả tính năng Free', included: true },
+    { text: 'AI Chat hỏi về dữ liệu kinh doanh', included: true },
+    { text: 'Cảnh báo thông minh tự động', included: true },
+    { text: 'Export báo cáo PDF/Excel', included: true },
+    { text: 'Đồng bộ tự động theo lịch', included: true },
+    { text: 'Hỗ trợ qua email ưu tiên', included: true },
   ];
 
   const handleUpgrade = () => {
     window.location.href = `/checkout?plan=pro&cycle=${billingCycle}`;
   };
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const res = await fetch('/api/user/cancel', {
+        method: 'POST',
+        headers: { 'x-user-id': user.userId },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCancelled(true);
+        setExpiresAt(data.expiresAt);
+        setShowCancelConfirm(false);
+      }
+    } catch (err) {
+      console.error('Cancel error:', err);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const isPro = userPlan === 'pro';
+  const isFree = userPlan === 'free' || !userPlan;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#14141f] to-[#1a1a2e]">
@@ -53,8 +99,8 @@ export default function BillingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div>
-              <h1 className="text-2xl font-display font-bold text-white">Nâng cấp tài khoản</h1>
-              <p className="text-sm text-[#6b6b80]">Mở khóa toàn bộ tính năng CEO Dashboard</p>
+              <h1 className="text-2xl font-display font-bold text-white">Gói dịch vụ</h1>
+              <p className="text-sm text-[#6b6b80]">Chọn gói phù hợp với nhu cầu của bạn</p>
             </div>
             <Link
               href="/dashboard"
@@ -67,44 +113,32 @@ export default function BillingPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Trial Status Banner */}
-        {!loading && userPlan === 'trial' && daysLeft !== null && (
-          <div className="mb-10 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center space-x-3">
-            <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
-            <p className="text-amber-300 text-sm">
-              Bạn đang trong thời gian dùng thử.{' '}
-              <strong className="text-amber-200">Còn {daysLeft} ngày</strong> trước khi tài khoản bị khóa.
-            </p>
-          </div>
-        )}
-        {!loading && userPlan === 'expired' && (
-          <div className="mb-10 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center space-x-3">
-            <Shield className="w-5 h-5 text-red-400 flex-shrink-0" />
-            <p className="text-red-300 text-sm">
-              Tài khoản của bạn đã hết hạn. Nâng cấp ngay để tiếp tục sử dụng.
-            </p>
-          </div>
-        )}
-        {!loading && userPlan === 'pro' && (
+        {/* Status Banners */}
+        {!loading && isPro && !cancelled && (
           <div className="mb-10 p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center space-x-3">
             <Star className="w-5 h-5 text-green-400 flex-shrink-0" />
             <p className="text-green-300 text-sm">
-              Bạn đang sử dụng gói <strong>Pro</strong>. Cảm ơn bạn đã tin dùng CEO Dashboard!
+              Bạn đang sử dụng gói <strong>Pro</strong>.
+              {expiresAt && <> Còn hiệu lực đến <strong>{formatDate(expiresAt)}</strong>.</>}
+            </p>
+          </div>
+        )}
+        {!loading && isPro && cancelled && (
+          <div className="mb-10 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center space-x-3">
+            <Shield className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            <p className="text-amber-300 text-sm">
+              Bạn đã hủy gói Pro. Vẫn sử dụng được đến <strong>{formatDate(expiresAt)}</strong>, sau đó sẽ chuyển về gói Free.
             </p>
           </div>
         )}
 
         {/* Hero */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 text-[#d4af37] text-sm font-medium mb-6">
-            <Zap className="w-4 h-4 mr-2" />
-            Dùng thử 7 ngày miễn phí
-          </div>
           <h2 className="text-4xl lg:text-5xl font-display font-bold text-white mb-4">
-            Một gói. Toàn bộ tính năng.
+            Chọn gói phù hợp
           </h2>
           <p className="text-[#a0a0b8] text-lg">
-            Không có gói Free hay Enterprise. Chỉ có Pro — với đầy đủ mọi công cụ bạn cần.
+            Bắt đầu miễn phí. Nâng cấp Pro khi cần AI Chat và tính năng nâng cao.
           </p>
         </div>
 
@@ -137,23 +171,58 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Pricing Card — centered, single plan */}
-        <div className="max-w-md mx-auto">
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          {/* Free Plan */}
+          <div className="relative rounded-2xl p-8 card-luxury border border-[#2a2a3e]">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#6b6b80] to-[#4b4b60] flex items-center justify-center mb-6">
+              <Shield className="w-7 h-7 text-white" />
+            </div>
+
+            <h3 className="text-2xl font-display font-bold text-white mb-1">Free</h3>
+            <div className="flex items-baseline mb-6">
+              <span className="text-4xl font-display font-bold text-white">0₫</span>
+              <span className="text-[#6b6b80] ml-2">/mãi mãi</span>
+            </div>
+
+            <ul className="space-y-3 mb-8">
+              {freeFeatures.map((f, i) => (
+                <li key={i} className="flex items-start space-x-3 text-sm">
+                  {f.included ? (
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XIcon className="w-5 h-5 text-[#4b4b60] flex-shrink-0 mt-0.5" />
+                  )}
+                  <span className={f.included ? 'text-white' : 'text-[#6b6b80]'}>{f.text}</span>
+                </li>
+              ))}
+            </ul>
+
+            {isFree ? (
+              <div className="w-full py-3 rounded-lg font-semibold text-center bg-[#1a1a2e] border border-[#2a2a3e] text-[#6b6b80] cursor-default">
+                Đang dùng
+              </div>
+            ) : (
+              <div className="w-full py-3 rounded-lg font-semibold text-center bg-[#1a1a2e] border border-[#2a2a3e] text-[#6b6b80] cursor-default">
+                Gói cơ bản
+              </div>
+            )}
+          </div>
+
+          {/* Pro Plan */}
           <div className="relative rounded-2xl p-8 card-luxury border-2 border-[#d4af37] shadow-2xl shadow-[#d4af37]/20">
-            {/* Badge */}
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1 bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] font-bold text-sm rounded-full whitespace-nowrap">
-              ✦ CEO PRO
+              CEO PRO
             </div>
 
-            {/* Icon */}
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#c19a6b] flex items-center justify-center mb-6">
-              <Zap className="w-7 h-7 text-[#0a0a0f]" />
+              <Crown className="w-7 h-7 text-[#0a0a0f]" />
             </div>
 
-            {/* Price */}
+            <h3 className="text-2xl font-display font-bold text-white mb-1">Pro</h3>
             <div className="mb-2">
               <div className="flex items-baseline">
-                <span className="text-5xl font-display font-bold text-white">
+                <span className="text-4xl font-display font-bold text-white">
                   {displayPrice.toLocaleString('vi-VN')}₫
                 </span>
                 <span className="text-[#6b6b80] ml-2">/tháng</span>
@@ -166,43 +235,77 @@ export default function BillingPage() {
               )}
               {billingCycle === 'monthly' && (
                 <p className="text-[#6b6b80] text-sm mt-1">
-                  Hoặc {Math.round(yearlyPrice / 12).toLocaleString('vi-VN')}₫/tháng khi trả năm (tiết kiệm 20%)
+                  Hoặc {Math.round(yearlyPrice / 12).toLocaleString('vi-VN')}₫/tháng khi trả năm
                 </p>
               )}
             </div>
 
-            {/* Trial note */}
-            <div className="flex items-center space-x-2 text-[#d4af37] text-sm mb-6 mt-3 p-3 rounded-lg bg-[#d4af37]/10 border border-[#d4af37]/20">
-              <Clock className="w-4 h-4 flex-shrink-0" />
-              <span>Dùng thử <strong>7 ngày miễn phí</strong> khi đăng ký mới — không cần thẻ</span>
-            </div>
-
-            {/* Features */}
-            <ul className="space-y-3 mb-8">
-              {features.map((f, i) => (
+            <ul className="space-y-3 mb-8 mt-6">
+              {proFeatures.map((f, i) => (
                 <li key={i} className="flex items-start space-x-3 text-sm">
                   <Check className="w-5 h-5 text-[#d4af37] flex-shrink-0 mt-0.5" />
-                  <span className="text-white">{f}</span>
+                  <span className="text-white">{f.text}</span>
                 </li>
               ))}
             </ul>
 
-            {/* CTA */}
-            {userPlan === 'pro' ? (
-              <div className="w-full py-3 rounded-lg font-semibold text-center bg-[#1a1a2e] border border-[#2a2a3e] text-[#6b6b80] cursor-default">
-                Bạn đang dùng gói này ✓
+            {isPro && !cancelled ? (
+              <div className="space-y-3">
+                <div className="w-full py-3 rounded-lg font-semibold text-center bg-[#1a1a2e] border border-[#2a2a3e] text-[#6b6b80] cursor-default">
+                  Đang dùng
+                </div>
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  className="w-full py-2 rounded-lg text-sm text-[#6b6b80] hover:text-red-400 transition-all"
+                >
+                  Hủy gói
+                </button>
+              </div>
+            ) : isPro && cancelled ? (
+              <div className="w-full py-3 rounded-lg font-semibold text-center bg-amber-500/10 border border-amber-500/30 text-amber-300 cursor-default text-sm">
+                Đã hủy — còn dùng đến {formatDate(expiresAt)}
               </div>
             ) : (
               <button
                 onClick={handleUpgrade}
                 className="w-full py-3 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] hover:shadow-xl hover:shadow-[#d4af37]/40 hover:scale-[1.02]"
               >
-                <span>{userPlan === 'trial' || userPlan === 'expired' ? 'Nâng cấp ngay' : 'Bắt đầu dùng thử'}</span>
+                <span>Nâng cấp ngay</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
+
+        {/* Cancel Confirmation Modal */}
+        {showCancelConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="card-luxury rounded-2xl p-8 max-w-md w-full mx-4 border border-[#2a2a3e]">
+              <h3 className="text-xl font-display font-bold text-white mb-3">Xác nhận hủy gói Pro</h3>
+              <p className="text-[#a0a0b8] text-sm mb-2">
+                Bạn sẽ vẫn sử dụng được gói Pro đến hết ngày <strong className="text-white">{formatDate(expiresAt)}</strong>.
+              </p>
+              <p className="text-[#a0a0b8] text-sm mb-6">
+                Sau đó tài khoản sẽ chuyển về gói Free. Bạn có thể nâng cấp lại bất kỳ lúc nào.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="flex-1 py-3 rounded-lg font-semibold bg-[#1a1a2e] border border-[#2a2a3e] text-white hover:bg-[#2a2a3e] transition-all"
+                >
+                  Giữ gói Pro
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="flex-1 py-3 rounded-lg font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all disabled:opacity-50"
+                >
+                  {cancelling ? 'Đang hủy...' : 'Xác nhận hủy'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* FAQ */}
         <div className="max-w-2xl mx-auto mt-16">
@@ -212,20 +315,20 @@ export default function BillingPage() {
           <div className="space-y-4">
             {[
               {
-                q: '7 ngày dùng thử hoạt động như thế nào?',
-                a: 'Khi đăng ký tài khoản mới, bạn được dùng thử toàn bộ tính năng Pro trong 7 ngày. Không cần thẻ tín dụng hay thanh toán trước.',
+                q: 'Gói Free bao gồm những gì?',
+                a: 'Gói Free cho phép bạn kết nối Google Sheets, xem dashboard tổng quan và biểu đồ. Bạn không thể sử dụng AI Chat, cảnh báo thông minh hay export báo cáo.',
               },
               {
-                q: 'Sau 7 ngày nếu tôi không nâng cấp thì sao?',
-                a: 'Tài khoản sẽ bị khóa và bạn không thể truy cập dashboard. Dữ liệu của bạn vẫn được giữ nguyên. Nâng cấp bất kỳ lúc nào để mở khóa.',
+                q: 'Tôi có thể hủy gói Pro bất cứ lúc nào không?',
+                a: 'Có. Bạn có thể hủy bất kỳ lúc nào. Gói Pro vẫn hoạt động đến hết chu kỳ đã thanh toán, sau đó tự động chuyển về Free.',
               },
               {
                 q: 'Phương thức thanh toán nào được chấp nhận?',
                 a: 'Chúng tôi chấp nhận thanh toán qua VNPay: thẻ ATM nội địa, thẻ tín dụng Visa/Mastercard, ví MoMo, ZaloPay.',
               },
               {
-                q: 'Tôi có thể hủy bất cứ lúc nào không?',
-                a: 'Có. Bạn có thể hủy bất kỳ lúc nào mà không mất phí. Gói Pro sẽ còn hiệu lực đến hết chu kỳ đã thanh toán.',
+                q: 'Dữ liệu có bị mất khi chuyển về Free không?',
+                a: 'Không. Toàn bộ dữ liệu của bạn vẫn được giữ nguyên. Bạn chỉ không thể sử dụng AI Chat và các tính năng Pro.',
               },
             ].map((faq, i) => (
               <div key={i} className="card-luxury rounded-xl p-6">

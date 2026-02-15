@@ -26,18 +26,14 @@ export async function getOrCreateUser(descopeUserId, email, name) {
 
   if (existing) return existing;
 
-  // Create new user with 7-day trial
-  const trialExpires = new Date();
-  trialExpires.setDate(trialExpires.getDate() + 7);
-
+  // Create new user with free plan
   const { data: newUser, error } = await db
     .from('users')
     .insert({
       descope_user_id: descopeUserId,
       email,
       name,
-      plan: 'trial',
-      plan_expires_at: trialExpires.toISOString(),
+      plan: 'free',
     })
     .select()
     .single();
@@ -63,6 +59,19 @@ export async function updateUserPlan(userId, plan, expiresAt) {
   const { data, error } = await db
     .from('users')
     .update({ plan, plan_expires_at: expiresAt })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function cancelUserPlan(userId) {
+  const db = getServerSupabase();
+  const { data, error } = await db
+    .from('users')
+    .update({ plan: 'pro_cancelled' })
     .eq('id', userId)
     .select()
     .single();

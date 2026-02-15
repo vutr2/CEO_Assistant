@@ -70,8 +70,9 @@ export default function Dashboard() {
   const [isTyping, setIsTyping] = useState(false);
   const [period, setPeriod] = useState(30);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [planStatus, setPlanStatus] = useState(null); // 'trial' | 'pro' | 'expired'
-  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
+  const [planStatus, setPlanStatus] = useState(null); // 'free' | 'pro' | 'expired'
+  const [planCancelled, setPlanCancelled] = useState(false);
+  const [planDaysLeft, setPlanDaysLeft] = useState(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -123,7 +124,8 @@ export default function Dashboard() {
       .then((r) => r.json())
       .then((d) => {
         setPlanStatus(d.plan);
-        setTrialDaysLeft(d.daysLeft);
+        setPlanCancelled(d.cancelled || false);
+        setPlanDaysLeft(d.daysLeft);
       })
       .catch(() => {});
   }, [user?.userId]);
@@ -324,33 +326,33 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Trial / Expired Banner */}
-      {planStatus === 'trial' && trialDaysLeft !== null && (
+      {/* Plan Banners */}
+      {planStatus === 'free' && (
+        <div className="bg-[#d4af37]/10 border-b border-[#d4af37]/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
+            <span className="text-[#d4af37] text-sm">
+              Nâng cấp Pro để sử dụng AI Chat và tính năng nâng cao.
+            </span>
+            <Link
+              href="/billing"
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/30 transition-all"
+            >
+              Xem gói Pro →
+            </Link>
+          </div>
+        </div>
+      )}
+      {planStatus === 'pro' && planCancelled && (
         <div className="bg-amber-500/10 border-b border-amber-500/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
             <span className="text-amber-300 text-sm">
-              ⏳ Còn <strong className="text-amber-200">{trialDaysLeft} ngày</strong> dùng thử miễn phí.
+              Gói Pro đã hủy — còn sử dụng được <strong className="text-amber-200">{planDaysLeft} ngày</strong>.
             </span>
             <Link
               href="/billing"
               className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-all"
             >
-              Nâng cấp ngay →
-            </Link>
-          </div>
-        </div>
-      )}
-      {planStatus === 'expired' && (
-        <div className="bg-red-500/10 border-b border-red-500/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
-            <span className="text-red-300 text-sm">
-              🔒 Tài khoản đã hết hạn. Nâng cấp để tiếp tục sử dụng đầy đủ tính năng.
-            </span>
-            <Link
-              href="/billing"
-              className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-200 hover:bg-red-500/30 transition-all"
-            >
-              Nâng cấp ngay →
+              Gia hạn →
             </Link>
           </div>
         </div>
@@ -364,6 +366,8 @@ export default function Dashboard() {
             trends={trends}
             period={period}
             setPeriod={setPeriod}
+            planStatus={planStatus}
+            user={user}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsView trends={trends} />}
@@ -374,17 +378,54 @@ export default function Dashboard() {
             setInput={setChatInput}
             onSubmit={handleChat}
             isTyping={isTyping}
+            planStatus={planStatus}
           />
         )}
-        {activeTab === 'alerts' && <AlertsView alerts={alerts} />}
-        {activeTab === 'sheets' && <SheetsView user={user} />}
+        {activeTab === 'alerts' && <AlertsView alerts={alerts} planStatus={planStatus} />}
+        {activeTab === 'sheets' && <SheetsView user={user} planStatus={planStatus} />}
       </main>
     </div>
   );
 }
 
 // Dashboard View Component
-function DashboardView({ summary, trends, period, setPeriod }) {
+function DashboardView({ summary, trends, period, setPeriod, planStatus, user }) {
+  const [exporting, setExporting] = useState(false);
+  const [showExportUpgrade, setShowExportUpgrade] = useState(false);
+
+  const handleExport = async () => {
+    if (planStatus === 'free') {
+      setShowExportUpgrade(true);
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.userId, period }),
+      });
+      if (res.status === 403) {
+        setShowExportUpgrade(true);
+        return;
+      }
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bao-cao-kinh-doanh-${period}ngay.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!summary) return null;
 
   const revenueChange = parseFloat(summary.changes.revenue);
@@ -413,6 +454,24 @@ function DashboardView({ summary, trends, period, setPeriod }) {
             <option value={30}>30 ngày</option>
             <option value={90}>90 ngày</option>
           </select>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+              planStatus === 'free'
+                ? 'bg-[#1a1a2e] border border-[#2a2a3e] text-[#6b6b80] hover:text-[#d4af37] hover:border-[#d4af37]/50'
+                : 'bg-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/30'
+            }`}
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#d4af37] border-t-transparent"></div>
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span className="text-sm font-medium">
+              {planStatus === 'free' ? 'Export Pro' : 'Export Excel'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -623,6 +682,39 @@ function DashboardView({ summary, trends, period, setPeriod }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Export upgrade modal */}
+      {showExportUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card-luxury rounded-2xl p-8 max-w-md w-full mx-4 border border-[#2a2a3e]">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#d4af37]/20 flex items-center justify-center mx-auto mb-4">
+                <Download className="w-8 h-8 text-[#d4af37]" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-white mb-3">
+                Tính năng Pro
+              </h3>
+              <p className="text-[#a0a0b8] mb-6">
+                Export báo cáo Excel giúp bạn tải về dữ liệu kinh doanh để chia sẻ với đội ngũ và đối tác. Nâng cấp Pro để sử dụng.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowExportUpgrade(false)}
+                  className="flex-1 py-3 rounded-lg font-semibold bg-[#1a1a2e] border border-[#2a2a3e] text-white hover:bg-[#2a2a3e] transition-all"
+                >
+                  Đóng
+                </button>
+                <Link
+                  href="/billing"
+                  className="flex-1 py-3 rounded-lg font-semibold text-center bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] hover:shadow-xl hover:shadow-[#d4af37]/40 transition-all"
+                >
+                  Nâng cấp Pro
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -752,7 +844,39 @@ function AnalyticsView({ trends }) {
 }
 
 // Chat View Component
-function ChatView({ messages, input, setInput, onSubmit, isTyping }) {
+function ChatView({ messages, input, setInput, onSubmit, isTyping, planStatus }) {
+  if (planStatus === 'free') {
+    return (
+      <div className="space-y-6 animate-in">
+        <div>
+          <h2 className="text-3xl font-display font-bold text-white mb-2">
+            AI Assistant
+          </h2>
+          <p className="text-[#a0a0b8]">
+            Hỏi bất kỳ điều gì về dữ liệu kinh doanh của bạn
+          </p>
+        </div>
+        <div className="card-luxury rounded-2xl p-6 h-[400px] flex flex-col items-center justify-center text-center">
+          <div className="w-20 h-20 rounded-2xl bg-[#d4af37]/20 flex items-center justify-center mb-6">
+            <Sparkles className="w-10 h-10 text-[#d4af37]" />
+          </div>
+          <h3 className="text-2xl font-display font-bold text-white mb-3">
+            Tính năng Pro
+          </h3>
+          <p className="text-[#a0a0b8] mb-6 max-w-md">
+            AI Chat giúp bạn hỏi về doanh thu, chi phí, lợi nhuận và đưa ra gợi ý kinh doanh thông minh. Nâng cấp Pro để sử dụng.
+          </p>
+          <Link
+            href="/billing"
+            className="px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] hover:shadow-xl hover:shadow-[#d4af37]/40 hover:scale-[1.02] transition-all"
+          >
+            Nâng cấp Pro →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in">
       <div>
@@ -842,7 +966,37 @@ function ChatView({ messages, input, setInput, onSubmit, isTyping }) {
 }
 
 // Alerts View Component
-function AlertsView({ alerts }) {
+function AlertsView({ alerts, planStatus }) {
+  if (planStatus === 'free') {
+    return (
+      <div className="space-y-6 animate-in">
+        <div>
+          <h2 className="text-3xl font-display font-bold text-white mb-2">
+            Cảnh báo & Thông báo
+          </h2>
+          <p className="text-[#a0a0b8]">Các vấn đề quan trọng cần chú ý</p>
+        </div>
+        <div className="card-luxury rounded-2xl p-6 h-[400px] flex flex-col items-center justify-center text-center">
+          <div className="w-20 h-20 rounded-2xl bg-[#d4af37]/20 flex items-center justify-center mb-6">
+            <Bell className="w-10 h-10 text-[#d4af37]" />
+          </div>
+          <h3 className="text-2xl font-display font-bold text-white mb-3">
+            Tính năng Pro
+          </h3>
+          <p className="text-[#a0a0b8] mb-6 max-w-md">
+            Cảnh báo thông minh tự động phát hiện các vấn đề về doanh thu giảm, chi phí tăng đột biến và biên lợi nhuận thấp. Nâng cấp Pro để sử dụng.
+          </p>
+          <Link
+            href="/billing"
+            className="px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] hover:shadow-xl hover:shadow-[#d4af37]/40 hover:scale-[1.02] transition-all"
+          >
+            Nâng cấp Pro →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in">
       <div>
@@ -898,7 +1052,7 @@ function AlertsView({ alerts }) {
 }
 
 // Sheets Connection View Component
-function SheetsView({ user }) {
+function SheetsView({ user, planStatus }) {
   const [sheetUrl, setSheetUrl] = useState('');
   const [connectedSheet, setConnectedSheet] = useState(null);
   const [serviceAccountEmail, setServiceAccountEmail] = useState('');
@@ -1102,6 +1256,16 @@ function SheetsView({ user }) {
                 <p className="text-[#6b6b80] text-xs">
                   Đồng bộ lần cuối: {new Date(connectedSheet.last_sync_at).toLocaleString('vi-VN')}
                 </p>
+              )}
+              {planStatus === 'pro' ? (
+                <div className="mt-2 flex items-center space-x-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                  <span className="text-emerald-400 text-xs font-medium">Tự động đồng bộ mỗi giờ</span>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center space-x-1.5">
+                  <span className="text-[#6b6b80] text-xs">Nâng cấp Pro để tự động đồng bộ mỗi giờ</span>
+                </div>
               )}
             </div>
 
