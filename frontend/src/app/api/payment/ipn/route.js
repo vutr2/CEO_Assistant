@@ -8,6 +8,8 @@ import {
 
 const VNPAY_HASH_SECRET = process.env.VNPAY_HASH_SECRET;
 
+/* ===================== UTILS ===================== */
+
 function sortObject(obj) {
   return Object.keys(obj)
     .sort()
@@ -17,6 +19,7 @@ function sortObject(obj) {
     }, {});
 }
 
+// Verify signature using raw query string to avoid decode/encode mismatch
 function verifyVNPaySignature(url, secureHash) {
   const urlObj = new URL(url);
   const queryString = urlObj.search.slice(1);
@@ -52,12 +55,16 @@ function verifyVNPaySignature(url, secureHash) {
 
 function vnpayResponse(code, message) {
   return NextResponse.json(
-    { RspCode: String(code).padStart(2, '0'), Message: message },
+    { RspCode: String(code), Message: message },
     { status: 200 }
   );
 }
 
+/* ===================== IPN HANDLER ===================== */
+
 export async function GET(request) {
+  console.log('[IPN] Received IPN request:', request.url);
+
   try {
     if (!VNPAY_HASH_SECRET) {
       console.error('[IPN] Missing VNPAY_HASH_SECRET');
@@ -82,7 +89,7 @@ export async function GET(request) {
 
     if (!txnRef || !secureHash) {
       console.error('[IPN] Missing params');
-      return vnpayResponse('99', 'Missing Parameters');
+      return vnpayResponse('97', 'Missing parameters');
     }
 
     // Verify signature
@@ -91,18 +98,23 @@ export async function GET(request) {
       return vnpayResponse('97', 'Invalid signature');
     }
 
-    // Look up order in Supabase
+    console.log('[IPN] Signature verified for txnRef:', txnRef);
+
+    // Find payment in Supabase
     const payment = await getPaymentByOrderId(txnRef);
 
     if (!payment) {
-      console.log('[IPN] Order not found in DB, confirming anyway:', txnRef);
+      console.log('[IPN] Order not found, ACK anyway:', txnRef);
       return vnpayResponse('00', 'Confirm Success');
     }
 
+    // Already processed — ACK to stop VNPay retrying
     if (payment.status === 'completed') {
-      return vnpayResponse('02', 'Order already confirmed');
+      console.log('[IPN] Already completed:', txnRef);
+      return vnpayResponse('00', 'Confirm Success');
     }
 
+    // Verify amount
     if (Number(payment.amount) !== Number(amount)) {
       console.error('[IPN] Amount mismatch:', {
         expected: payment.amount,
@@ -111,17 +123,18 @@ export async function GET(request) {
       return vnpayResponse('04', 'Invalid amount');
     }
 
+    // Payment success
     if (responseCode === '00' && transactionStatus === '00') {
-      // Payment succeeded - update payment record
       await updatePaymentStatus(txnRef, 'completed', {
         vnp_transaction_no: transactionNo,
         vnp_pay_date: vnpParams.vnp_PayDate,
         vnp_bank_code: vnpParams.vnp_BankCode,
         vnp_card_type: vnpParams.vnp_CardType,
         vnp_response_code: responseCode,
+        vnp_transaction_status: transactionStatus,
       });
 
-      // Update user plan — always 'pro', duration depends on cycle
+      // Update user plan
       const expiresAt = new Date();
       const isYearly = payment.cycle === 'yearly';
       if (isYearly) {
@@ -132,19 +145,26 @@ export async function GET(request) {
 
       await updateUserPlan(payment.user_id, 'pro', expiresAt.toISOString());
 
-      console.log('[IPN] Payment completed:', txnRef);
-    } else {
-      // Payment failed
-      await updatePaymentStatus(txnRef, 'failed', {
-        vnp_response_code: responseCode,
-      });
-
-      console.log('[IPN] Payment failed:', txnRef, responseCode);
+      console.log('[IPN] Payment completed & plan updated:', txnRef);
+      return vnpayResponse('00', 'Confirm Success');
     }
 
+    // Payment failed/cancelled
+    await updatePaymentStatus(txnRef, 'failed', {
+      vnp_response_code: responseCode,
+      vnp_transaction_status: transactionStatus,
+      vnp_transaction_no: transactionNo,
+    });
+
+    console.log('[IPN] Payment failed:', txnRef, 'code:', responseCode);
     return vnpayResponse('00', 'Confirm Success');
   } catch (error) {
     console.error('[IPN] Error:', error);
     return vnpayResponse('99', 'Unknown error');
   }
+}
+
+// VNPay may call POST as well
+export async function POST(request) {
+  return GET(request);
 }
