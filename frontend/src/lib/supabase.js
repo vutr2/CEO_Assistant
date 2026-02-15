@@ -26,10 +26,19 @@ export async function getOrCreateUser(descopeUserId, email, name) {
 
   if (existing) return existing;
 
-  // Create new user
+  // Create new user with 7-day trial
+  const trialExpires = new Date();
+  trialExpires.setDate(trialExpires.getDate() + 7);
+
   const { data: newUser, error } = await db
     .from('users')
-    .insert({ descope_user_id: descopeUserId, email, name })
+    .insert({
+      descope_user_id: descopeUserId,
+      email,
+      name,
+      plan: 'trial',
+      plan_expires_at: trialExpires.toISOString(),
+    })
     .select()
     .single();
 
@@ -64,7 +73,7 @@ export async function updateUserPlan(userId, plan, expiresAt) {
 
 // --- Payment helpers ---
 
-export async function createPayment({ userId, orderId, planId, amount }) {
+export async function createPayment({ userId, orderId, planId, amount, cycle }) {
   const db = getServerSupabase();
   const { data, error } = await db
     .from('payments')
@@ -73,6 +82,7 @@ export async function createPayment({ userId, orderId, planId, amount }) {
       order_id: orderId,
       plan_id: planId,
       amount,
+      cycle: cycle || 'monthly',
       status: 'pending',
     })
     .select()
@@ -170,14 +180,18 @@ export async function getChatHistory(userId, limit = 50) {
   return data || [];
 }
 
-// --- Sync Token helpers ---
+// --- User Sheets helpers ---
 
-export async function createSyncToken(userId, label = 'Google Sheets') {
+export async function saveUserSheet(userId, sheetId, sheetUrl, sheetName) {
   const db = getServerSupabase();
-  const token = crypto.randomUUID();
   const { data, error } = await db
-    .from('sync_tokens')
-    .insert({ user_id: userId, token, label })
+    .from('user_sheets')
+    .upsert({
+      user_id: userId,
+      sheet_id: sheetId,
+      sheet_url: sheetUrl,
+      sheet_name: sheetName || '',
+    }, { onConflict: 'user_id,sheet_id' })
     .select()
     .single();
 
@@ -185,48 +199,39 @@ export async function createSyncToken(userId, label = 'Google Sheets') {
   return data;
 }
 
-export async function getSyncTokens(userId) {
+export async function getUserSheet(userId) {
   const db = getServerSupabase();
   const { data, error } = await db
-    .from('sync_tokens')
+    .from('user_sheets')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function validateSyncToken(token) {
-  const db = getServerSupabase();
-  const { data, error } = await db
-    .from('sync_tokens')
-    .select('*, users(*)')
-    .eq('token', token)
     .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
 
-  if (error) return null;
-  return data;
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
 }
 
-export async function deleteSyncToken(tokenId, userId) {
+export async function deleteUserSheet(userId, sheetId) {
   const db = getServerSupabase();
   const { error } = await db
-    .from('sync_tokens')
+    .from('user_sheets')
     .delete()
-    .eq('id', tokenId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .eq('sheet_id', sheetId);
 
   if (error) throw error;
 }
 
-export async function updateSyncTokenLastSync(token) {
+export async function updateSheetLastSync(userId, sheetId) {
   const db = getServerSupabase();
   await db
-    .from('sync_tokens')
+    .from('user_sheets')
     .update({ last_sync_at: new Date().toISOString() })
-    .eq('token', token);
+    .eq('user_id', userId)
+    .eq('sheet_id', sheetId);
 }
 
 // --- Sheets data upsert helpers ---
@@ -244,6 +249,7 @@ export async function upsertOrders(userId, rows) {
     status: r.status || 'completed',
     notes: r.notes || '',
     sheet_row_id: r.sheetRowId || r.sheet_row_id || null,
+    extra_data: r.extraData || r.extra_data || {},
   }));
 
   const { data, error } = await db
@@ -266,6 +272,7 @@ export async function upsertExpenses(userId, rows) {
     paid_by: r.paidBy || r.paid_by || '',
     notes: r.notes || '',
     sheet_row_id: r.sheetRowId || r.sheet_row_id || null,
+    extra_data: r.extraData || r.extra_data || {},
   }));
 
   const { data, error } = await db
@@ -288,6 +295,7 @@ export async function upsertInventory(userId, rows) {
     stock_remaining: parseFloat(r.stockRemaining || r.stock_remaining) || 0,
     notes: r.notes || '',
     sheet_row_id: r.sheetRowId || r.sheet_row_id || null,
+    extra_data: r.extraData || r.extra_data || {},
   }));
 
   const { data, error } = await db
@@ -311,6 +319,7 @@ export async function upsertEmployees(userId, rows) {
     status: r.status || 'active',
     notes: r.notes || '',
     sheet_row_id: r.sheetRowId || r.sheet_row_id || null,
+    extra_data: r.extraData || r.extra_data || {},
   }));
 
   const { data, error } = await db
@@ -423,4 +432,42 @@ export async function checkAndCreateAlerts(userId, date) {
   if (alerts.length > 0) {
     await db.from('alerts').insert(alerts);
   }
+}
+
+// --- Generic sheet_data helpers (for custom tabs) ---
+
+export async function upsertSheetData(userId, tabName, rows) {
+  const db = getServerSupabase();
+  const mapped = rows.map((r) => ({
+    user_id: userId,
+    tab_name: tabName,
+    row_index: r.rowIndex || r.row_index,
+    data: r.data || {},
+    sheet_row_id: r.sheetRowId || r.sheet_row_id || null,
+  }));
+
+  const { data, error } = await db
+    .from('sheet_data')
+    .upsert(mapped, { onConflict: 'user_id,tab_name,row_index', ignoreDuplicates: false })
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getSheetData(userId, tabName) {
+  const db = getServerSupabase();
+  const query = db
+    .from('sheet_data')
+    .select('*')
+    .eq('user_id', userId)
+    .order('row_index', { ascending: true });
+
+  if (tabName) {
+    query.eq('tab_name', tabName);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
 }

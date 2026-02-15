@@ -31,7 +31,7 @@ export async function GET(request) {
       const errorMessage = errorMessages[responseCode] || 'Thanh toán thất bại';
 
       return NextResponse.redirect(
-        `${APP_URL}/payment/callback?status=failed&message=${errorMessage}`
+        `${APP_URL}/payment/callback?status=failed&message=${encodeURIComponent(errorMessage)}`
       );
     }
   } catch (error) {

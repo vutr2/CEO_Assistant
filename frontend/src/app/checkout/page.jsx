@@ -10,39 +10,23 @@ import {
   ArrowLeft,
   Loader2,
   Zap,
-  Crown,
   Check,
 } from 'lucide-react';
 
 const plans = {
   pro: {
-    name: 'Professional',
+    name: 'CEO Pro',
     icon: Zap,
-    color: 'from-blue-500 to-cyan-600',
-    monthly: 299000,
-    yearly: Math.round(299000 * 12 * 0.8),
-    features: [
-      '90 ngày dữ liệu',
-      '500 câu hỏi AI/tháng',
-      'Báo cáo nâng cao',
-      '5 người dùng',
-      'Biểu đồ thời gian thực',
-      'Export dữ liệu',
-    ],
-  },
-  enterprise: {
-    name: 'Enterprise',
-    icon: Crown,
     color: 'from-[#d4af37] to-[#c19a6b]',
-    monthly: 999000,
-    yearly: Math.round(999000 * 12 * 0.8),
+    monthly: 199000,
+    yearly: Math.round(199000 * 12 * 0.8),
     features: [
-      'Dữ liệu không giới hạn',
-      'AI không giới hạn',
-      'Báo cáo tùy chỉnh',
-      'Không giới hạn người dùng',
-      'API access đầy đủ',
-      'Hỗ trợ 24/7 ưu tiên',
+      'Ket noi Google Sheets khong gioi han',
+      'Doc tat ca tab & cot dong',
+      'Dashboard phan tich tong quan',
+      'AI Chat hoi ve du lieu kinh doanh',
+      'Canh bao thong minh',
+      'Export bao cao PDF/Excel',
     ],
   },
 };
@@ -84,6 +68,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           amount,
           planId,
+          cycle,
           userId: user?.userId || 'anonymous',
           userEmail: user?.email || 'unknown',
         }),

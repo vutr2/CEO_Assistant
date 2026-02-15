@@ -12,6 +12,7 @@
     "@descope/react-sdk": "^2.26.3",
     "@descope/web-js-sdk": "^1.45.0",
     "@supabase/supabase-js": "^2.95.3",
+    "googleapis": "^171.4.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",

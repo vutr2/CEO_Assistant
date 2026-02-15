@@ -121,11 +121,16 @@ export async function GET(request) {
         vnp_response_code: responseCode,
       });
 
-      // Update user plan
+      // Update user plan — always 'pro', duration depends on cycle
       const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+      const isYearly = payment.cycle === 'yearly';
+      if (isYearly) {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      } else {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      }
 
-      await updateUserPlan(payment.user_id, payment.plan_id, expiresAt.toISOString());
+      await updateUserPlan(payment.user_id, 'pro', expiresAt.toISOString());
 
       console.log('[IPN] Payment completed:', txnRef);
     } else {

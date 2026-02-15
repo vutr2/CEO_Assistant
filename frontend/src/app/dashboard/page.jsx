@@ -70,6 +70,8 @@ export default function Dashboard() {
   const [isTyping, setIsTyping] = useState(false);
   const [period, setPeriod] = useState(30);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [planStatus, setPlanStatus] = useState(null); // 'trial' | 'pro' | 'expired'
+  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -113,6 +115,18 @@ export default function Dashboard() {
       loadDashboardData();
     }
   }, [loadDashboardData, user?.userId]);
+
+  // Fetch plan status
+  useEffect(() => {
+    if (!user?.userId) return;
+    fetch('/api/user/plan', { headers: { 'x-user-id': user.userId } })
+      .then((r) => r.json())
+      .then((d) => {
+        setPlanStatus(d.plan);
+        setTrialDaysLeft(d.daysLeft);
+      })
+      .catch(() => {});
+  }, [user?.userId]);
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -309,6 +323,38 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* Trial / Expired Banner */}
+      {planStatus === 'trial' && trialDaysLeft !== null && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
+            <span className="text-amber-300 text-sm">
+              ⏳ Còn <strong className="text-amber-200">{trialDaysLeft} ngày</strong> dùng thử miễn phí.
+            </span>
+            <Link
+              href="/billing"
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-all"
+            >
+              Nâng cấp ngay →
+            </Link>
+          </div>
+        </div>
+      )}
+      {planStatus === 'expired' && (
+        <div className="bg-red-500/10 border-b border-red-500/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
+            <span className="text-red-300 text-sm">
+              🔒 Tài khoản đã hết hạn. Nâng cấp để tiếp tục sử dụng đầy đủ tính năng.
+            </span>
+            <Link
+              href="/billing"
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-200 hover:bg-red-500/30 transition-all"
+            >
+              Nâng cấp ngay →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -853,60 +899,102 @@ function AlertsView({ alerts }) {
 
 // Sheets Connection View Component
 function SheetsView({ user }) {
-  const [tokens, setTokens] = useState([]);
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [connectedSheet, setConnectedSheet] = useState(null);
+  const [serviceAccountEmail, setServiceAccountEmail] = useState('');
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [error, setError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-  const [showScript, setShowScript] = useState(false);
 
   useEffect(() => {
-    if (user?.userId) loadTokens();
+    if (user?.userId) loadConnection();
   }, [user?.userId]);
 
-  const loadTokens = async () => {
+  const loadConnection = async () => {
     try {
-      const res = await fetch('/api/sync-token', {
+      const res = await fetch('/api/sheets/connect', {
         headers: { 'x-user-id': user.userId },
       });
       if (res.ok) {
         const data = await res.json();
-        setTokens(data);
+        setConnectedSheet(data.sheet);
+        setServiceAccountEmail(data.serviceAccountEmail || '');
       }
     } catch (err) {
-      console.error('Failed to load tokens:', err);
+      console.error('Failed to load connection:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const createToken = async () => {
-    setCreating(true);
+  const handleConnect = async () => {
+    if (!sheetUrl.trim()) {
+      setError('Vui lòng nhập URL Google Sheets');
+      return;
+    }
+    setConnecting(true);
+    setError(null);
     try {
-      const res = await fetch('/api/sync-token', {
+      const res = await fetch('/api/sheets/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.userId, email: user.email, name: user.name }),
+        body: JSON.stringify({ userId: user.userId, sheetUrl, email: user.email, name: user.name }),
       });
+      const data = await res.json();
       if (res.ok) {
-        await loadTokens();
+        setConnectedSheet(data.sheet);
+        setSheetUrl('');
+      } else {
+        setError(data.error || 'Không thể kết nối');
+        if (data.serviceAccountEmail) {
+          setServiceAccountEmail(data.serviceAccountEmail);
+        }
       }
     } catch (err) {
-      console.error('Failed to create token:', err);
+      setError('Lỗi kết nối: ' + err.message);
     } finally {
-      setCreating(false);
+      setConnecting(false);
     }
   };
 
-  const deleteToken = async (tokenId) => {
+  const handleDisconnect = async () => {
     try {
-      await fetch('/api/sync-token', {
+      await fetch('/api/sheets/connect', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.userId, tokenId }),
+        body: JSON.stringify({ userId: user.userId }),
       });
-      await loadTokens();
+      setConnectedSheet(null);
+      setSyncResult(null);
     } catch (err) {
-      console.error('Failed to delete token:', err);
+      console.error('Failed to disconnect:', err);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/sheets/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncResult(data);
+        await loadConnection();
+      } else {
+        setError(data.error || 'Đồng bộ thất bại');
+      }
+    } catch (err) {
+      setError('Lỗi đồng bộ: ' + err.message);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -916,114 +1004,6 @@ function SheetsView({ user }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const syncToken = tokens[0]?.token || 'YOUR_SYNC_TOKEN';
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-
-  const appsScriptCode = `// =============================================
-// CEO Dashboard - Google Sheets Auto Sync
-// =============================================
-// 1. Paste toàn bộ code này vào Extensions → Apps Script
-// 2. Nhấn Save (Ctrl+S)
-// 3. Chọn hàm setupTrigger → nhấn Run (▶)
-// =============================================
-
-var CONFIG = {
-  SYNC_TOKEN: '${syncToken}',
-  APP_URL: '${appUrl}',
-};
-
-var SHEET_MAP = {
-  'DonHang': 'orders',
-  'ChiPhi': 'expenses',
-  'KhoHang': 'inventory',
-  'NhanSu': 'employees',
-};
-
-function onEdit(e) {
-  var sheet = e.source.getActiveSheet();
-  var sheetName = sheet.getName();
-  if (!SHEET_MAP[sheetName]) return;
-  Utilities.sleep(2000);
-  syncSheet(sheetName);
-}
-
-function syncSheet(sheetName) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return;
-  var sheetType = SHEET_MAP[sheetName];
-  if (!sheetType) return;
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return;
-  var rows = [];
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    if (!row[0] && !row[1]) continue;
-    var rowData = parseRow(sheetType, row, sheetName + '_' + (i + 1));
-    if (rowData) rows.push(rowData);
-  }
-  if (rows.length === 0) return;
-  try {
-    var response = UrlFetchApp.fetch(CONFIG.APP_URL + '/api/sheets/sync', {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'x-sync-token': CONFIG.SYNC_TOKEN },
-      payload: JSON.stringify({ sheetType: sheetType, rows: rows }),
-      muteHttpExceptions: true,
-    });
-    var code = response.getResponseCode();
-    if (code === 200) {
-      SpreadsheetApp.getActiveSpreadsheet().toast('Đã đồng bộ ' + rows.length + ' dòng từ ' + sheetName, 'Sync thành công ✓', 3);
-    } else {
-      SpreadsheetApp.getActiveSpreadsheet().toast('Lỗi: ' + response.getContentText(), 'Sync thất bại ✗', 5);
-    }
-  } catch (err) {
-    SpreadsheetApp.getActiveSpreadsheet().toast('Lỗi: ' + err.message, 'Sync thất bại ✗', 5);
-  }
-}
-
-function parseRow(sheetType, row, sheetRowId) {
-  switch (sheetType) {
-    case 'orders':
-      return { date: fmtDate(row[0]), customerName: String(row[1]||''), product: String(row[2]||''), quantity: Number(row[3])||0, unitPrice: Number(row[4])||0, total: Number(row[5])||(Number(row[3])||0)*(Number(row[4])||0), status: String(row[6]||'completed'), notes: String(row[7]||''), sheetRowId: sheetRowId };
-    case 'expenses':
-      return { date: fmtDate(row[0]), category: String(row[1]||''), description: String(row[2]||''), amount: Number(row[3])||0, paidBy: String(row[4]||''), notes: String(row[5]||''), sheetRowId: sheetRowId };
-    case 'inventory':
-      return { date: fmtDate(row[0]), productName: String(row[1]||''), quantityIn: Number(row[2])||0, quantityOut: Number(row[3])||0, stockRemaining: Number(row[4])||0, notes: String(row[5]||''), sheetRowId: sheetRowId };
-    case 'employees':
-      return { employeeName: String(row[0]||''), role: String(row[1]||''), department: String(row[2]||''), salary: Number(row[3])||0, startDate: fmtDate(row[4]), status: String(row[5]||'active'), notes: String(row[6]||''), sheetRowId: sheetRowId };
-    default: return null;
-  }
-}
-
-function fmtDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) {
-    return value.getFullYear() + '-' + ('0'+(value.getMonth()+1)).slice(-2) + '-' + ('0'+value.getDate()).slice(-2);
-  }
-  var parts = String(value).split('/');
-  if (parts.length === 3) return parts[2] + '-' + parts[1] + '-' + parts[0];
-  return String(value);
-}
-
-function setupTrigger() {
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) ScriptApp.deleteTrigger(triggers[i]);
-  ScriptApp.newTrigger('onEdit').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
-  SpreadsheetApp.getActiveSpreadsheet().toast('Auto-sync đã được bật!', 'Cài đặt thành công ✓', 5);
-}
-
-function syncAll() {
-  var names = Object.keys(SHEET_MAP);
-  for (var i = 0; i < names.length; i++) syncSheet(names[i]);
-}
-
-function onOpen() {
-  SpreadsheetApp.getUi().createMenu('CEO Dashboard')
-    .addItem('Sync tất cả', 'syncAll')
-    .addItem('Cài đặt Auto-Sync', 'setupTrigger')
-    .addToUi();
-}`;
-
   return (
     <div className="space-y-6 animate-in">
       <div>
@@ -1031,156 +1011,180 @@ function onOpen() {
           Kết nối Google Sheets
         </h2>
         <p className="text-[#a0a0b8]">
-          Nhân viên nhập dữ liệu vào Google Sheets, tự động đồng bộ lên Dashboard
+          Nhân viên nhập dữ liệu vào Google Sheets, nhấn đồng bộ để cập nhật Dashboard
         </p>
       </div>
 
-      {/* Step-by-step guide */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { step: '1', title: 'Tạo Sync Token', desc: 'Lấy mã kết nối bên dưới' },
-          { step: '2', title: 'Cài Google Apps Script', desc: 'Paste code vào Google Sheets' },
-          { step: '3', title: 'Nhân viên nhập liệu', desc: 'Data tự động lên Dashboard' },
-        ].map((s) => (
-          <div key={s.step} className="card-luxury rounded-2xl p-5 flex items-start space-x-4">
-            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37] font-bold text-lg shrink-0">
-              {s.step}
-            </div>
-            <div>
-              <p className="text-white font-semibold">{s.title}</p>
-              <p className="text-[#6b6b80] text-sm">{s.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Sync Tokens */}
+      {/* Step-by-step guide with service account email */}
       <div className="card-luxury rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-display font-bold text-white">Sync Tokens</h3>
-          <button
-            onClick={createToken}
-            disabled={creating}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] font-semibold flex items-center space-x-2 hover:shadow-lg hover:shadow-[#d4af37]/30 transition-all disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{creating ? 'Đang tạo...' : 'Tạo Token mới'}</span>
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="text-[#6b6b80]">Đang tải...</p>
-        ) : tokens.length === 0 ? (
-          <p className="text-[#6b6b80]">{'Chưa có token nào. Nhấn "Tạo Token mới" để bắt đầu.'}</p>
-        ) : (
-          <div className="space-y-3">
-            {tokens.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-[#0a0a0f]/50 border border-[#2a2a3e]"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <Link2 className="w-4 h-4 text-[#d4af37]" />
-                    <span className="text-white font-medium">{t.label}</span>
-                  </div>
-                  <code className="text-[#a0a0b8] text-sm font-mono block truncate">
-                    {t.token}
+        <h3 className="text-xl font-display font-bold text-white mb-5">
+          Hướng dẫn kết nối (chỉ 3 bước)
+        </h3>
+        <div className="space-y-5">
+          {/* Step 1 */}
+          <div className="flex items-start space-x-4">
+            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37] font-bold text-lg shrink-0">
+              1
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-semibold mb-2">Cấp quyền xem cho hệ thống</p>
+              <p className="text-[#a0a0b8] text-sm mb-3">
+                Mở Google Sheet của bạn → nhấn nút <span className="text-white font-semibold">Chia sẻ (Share)</span> ở góc trên bên phải → dán email bên dưới vào → chọn quyền <span className="text-white font-semibold">Người xem (Viewer)</span> → nhấn <span className="text-white font-semibold">Gửi (Send)</span>
+              </p>
+              {serviceAccountEmail && (
+                <div className="flex items-center space-x-2">
+                  <code className="flex-1 p-3 rounded-lg bg-[#0a0a0f] border border-[#2a2a3e] text-[#d4af37] font-mono text-sm break-all">
+                    {serviceAccountEmail}
                   </code>
-                  {t.last_sync_at && (
-                    <p className="text-[#6b6b80] text-xs mt-1">
-                      Sync lần cuối: {new Date(t.last_sync_at).toLocaleString('vi-VN')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2 ml-4">
                   <button
-                    onClick={() => copyToClipboard(t.token, t.id)}
-                    className="p-2 rounded-lg text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
-                    title="Copy token"
+                    onClick={() => copyToClipboard(serviceAccountEmail, 'email')}
+                    className="p-3 rounded-lg border border-[#2a2a3e] text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all shrink-0"
                   >
-                    {copiedId === t.id ? (
+                    {copiedId === 'email' ? (
                       <Check className="w-4 h-4 text-emerald-400" />
                     ) : (
                       <Copy className="w-4 h-4" />
                     )}
                   </button>
-                  <button
-                    onClick={() => deleteToken(t.id)}
-                    className="p-2 rounded-lg text-[#a0a0b8] hover:text-red-400 hover:bg-[#1a1a2e] transition-all"
-                    title="Xóa token"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Google Apps Script Instructions */}
-      <div className="card-luxury rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-display font-bold text-white">
-            Hướng dẫn cài đặt Google Apps Script
-          </h3>
-          <button
-            onClick={() => setShowScript(!showScript)}
-            className="px-4 py-2 rounded-lg border border-[#2a2a3e] text-[#a0a0b8] hover:text-white hover:bg-[#1a1a2e] transition-all"
-          >
-            {showScript ? 'Ẩn code' : 'Xem code'}
-          </button>
-        </div>
-
-        <div className="space-y-4 text-[#a0a0b8]">
-          <div className="space-y-2">
-            <p><span className="text-[#d4af37] font-semibold">Bước 1:</span> Tạo Google Sheets mới với 4 tab:</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {[
-                { name: 'DonHang', desc: 'Đơn hàng' },
-                { name: 'ChiPhi', desc: 'Chi phí' },
-                { name: 'KhoHang', desc: 'Kho hàng' },
-                { name: 'NhanSu', desc: 'Nhân sự' },
-              ].map((tab) => (
-                <div key={tab.name} className="p-3 rounded-lg bg-[#0a0a0f]/50 border border-[#2a2a3e]">
-                  <p className="text-white font-mono text-sm">{tab.name}</p>
-                  <p className="text-[#6b6b80] text-xs">{tab.desc}</p>
-                </div>
-              ))}
+              )}
             </div>
           </div>
 
-          <p><span className="text-[#d4af37] font-semibold">Bước 2:</span> Vào menu Extensions → Apps Script</p>
-          <p><span className="text-[#d4af37] font-semibold">Bước 3:</span> Xóa code mặc định, paste toàn bộ code bên dưới vào</p>
-          <p><span className="text-[#d4af37] font-semibold">Bước 4:</span> Thay <code className="text-[#d4af37]">YOUR_SYNC_TOKEN</code> bằng token ở trên</p>
-          <p><span className="text-[#d4af37] font-semibold">Bước 5:</span> Thay <code className="text-[#d4af37]">YOUR_APP_URL</code> bằng URL ứng dụng</p>
-          <p><span className="text-[#d4af37] font-semibold">Bước 6:</span> Chạy hàm <code className="text-[#d4af37]">setupTrigger()</code> một lần để bật auto-sync</p>
-        </div>
+          {/* Step 2 */}
+          <div className="flex items-start space-x-4">
+            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37] font-bold text-lg shrink-0">
+              2
+            </div>
+            <div>
+              <p className="text-white font-semibold mb-1">Dán link Google Sheet vào ô bên dưới</p>
+              <p className="text-[#a0a0b8] text-sm">
+                Copy đường link trên thanh địa chỉ trình duyệt khi đang mở Google Sheet, rồi dán vào ô &quot;Kết nối&quot; phía dưới.
+              </p>
+            </div>
+          </div>
 
-        {showScript && (
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[#6b6b80] text-sm">Google Apps Script</span>
+          {/* Step 3 */}
+          <div className="flex items-start space-x-4">
+            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37] font-bold text-lg shrink-0">
+              3
+            </div>
+            <div>
+              <p className="text-white font-semibold mb-1">Nhấn &quot;Đồng bộ ngay&quot;</p>
+              <p className="text-[#a0a0b8] text-sm">
+                Dữ liệu từ Google Sheet sẽ tự động được đọc và hiển thị trên Dashboard. Mỗi khi nhân viên cập nhật sheet, bạn chỉ cần nhấn đồng bộ lại.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Connection Card */}
+      <div className="card-luxury rounded-2xl p-6">
+        <h3 className="text-xl font-display font-bold text-white mb-4">
+          {connectedSheet ? 'Sheet đã kết nối' : 'Kết nối Google Sheet'}
+        </h3>
+
+        {loading ? (
+          <p className="text-[#6b6b80]">Đang tải...</p>
+        ) : connectedSheet ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-[#0a0a0f]/50 border border-emerald-500/30">
+              <div className="flex items-center space-x-2 mb-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <span className="text-white font-semibold">{connectedSheet.sheet_name || 'Google Sheet'}</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">Đã kết nối</span>
+              </div>
+              <code className="text-[#6b6b80] text-xs font-mono block truncate mb-2">
+                {connectedSheet.sheet_url}
+              </code>
+              {connectedSheet.last_sync_at && (
+                <p className="text-[#6b6b80] text-xs">
+                  Đồng bộ lần cuối: {new Date(connectedSheet.last_sync_at).toLocaleString('vi-VN')}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3">
               <button
-                onClick={() => copyToClipboard(appsScriptCode, 'script')}
-                className="px-3 py-1 rounded-lg text-xs text-[#a0a0b8] hover:text-white border border-[#2a2a3e] hover:bg-[#1a1a2e] transition-all flex items-center space-x-1"
+                onClick={handleSync}
+                disabled={syncing}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] font-semibold flex items-center space-x-2 hover:shadow-lg hover:shadow-[#d4af37]/30 transition-all disabled:opacity-50"
               >
-                {copiedId === 'script' ? (
-                  <><Check className="w-3 h-3 text-emerald-400" /><span>Đã copy!</span></>
+                {syncing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#0a0a0f] border-t-transparent"></div>
+                    <span>Đang đồng bộ...</span>
+                  </>
                 ) : (
-                  <><Copy className="w-3 h-3" /><span>Copy config</span></>
+                  <>
+                    <Activity className="w-4 h-4" />
+                    <span>Đồng bộ ngay</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleDisconnect}
+                className="px-4 py-3 rounded-xl border border-[#2a2a3e] text-red-400 hover:bg-red-500/10 transition-all flex items-center space-x-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ngắt kết nối</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={sheetUrl}
+                onChange={(e) => setSheetUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                className="flex-1 px-4 py-3 rounded-xl bg-[#0a0a0f] border border-[#2a2a3e] text-white placeholder-[#6b6b80] focus:outline-none focus:border-[#d4af37]"
+              />
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#c19a6b] text-[#0a0a0f] font-semibold flex items-center space-x-2 hover:shadow-lg hover:shadow-[#d4af37]/30 transition-all disabled:opacity-50"
+              >
+                {connecting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#0a0a0f] border-t-transparent"></div>
+                    <span>Đang kết nối...</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-4 h-4" />
+                    <span>Kết nối</span>
+                  </>
                 )}
               </button>
             </div>
-            <pre className="p-4 rounded-xl bg-[#0a0a0f] border border-[#2a2a3e] text-sm text-[#a0a0b8] font-mono overflow-x-auto max-h-64 overflow-y-auto">
-{appsScriptCode}
+          </div>
+        )}
 
-{`
-// Xem file đầy đủ tại:
-// google-apps-script/sync.js trong source code
-// Hoặc liên hệ admin để lấy script hoàn chỉnh`}
-            </pre>
+        {/* Error display */}
+        {error && (
+          <div className="mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Sync Result */}
+        {syncResult && (
+          <div className="mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+            <p className="text-emerald-400 font-semibold mb-2">Đồng bộ thành công!</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(syncResult.results).map(([tabName, info]) => (
+                <div key={tabName} className="text-center">
+                  <p className="text-2xl font-bold text-white">{info.count}</p>
+                  <p className="text-[#6b6b80] text-xs">{tabName}</p>
+                  <p className="text-[#4b4b60] text-[10px]">
+                    {info.type === 'known' ? info.sheetType : 'custom'}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1190,6 +1194,9 @@ function onOpen() {
         <h3 className="text-xl font-display font-bold text-white mb-4">
           Cấu trúc các tab trong Google Sheets
         </h3>
+        <p className="text-[#a0a0b8] mb-4">
+          Tạo Google Sheets với các tab sau. Dòng đầu tiên là header. Bạn có thể thêm cột và tab tùy ý — hệ thống sẽ tự động đọc tất cả.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
             {

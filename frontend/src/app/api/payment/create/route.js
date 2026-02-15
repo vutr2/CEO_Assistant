@@ -5,7 +5,7 @@ import { createPayment, getUserByDescopeId } from '../../../../lib/supabase';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { amount, planId, userId } = body;
+    const { amount, planId, userId, cycle } = body;
 
     // Validate input
     if (!amount || !planId || !userId) {
@@ -43,6 +43,7 @@ export async function POST(request) {
           orderId,
           planId,
           amount,
+          cycle: cycle || 'monthly',
         });
       }
     } catch (dbError) {
