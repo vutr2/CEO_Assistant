@@ -6,6 +6,7 @@ export const vnpayConfig = {
   vnp_HashSecret: process.env.VNPAY_HASH_SECRET,
   vnp_Url: process.env.VNPAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
   vnp_ReturnUrl: process.env.VNPAY_RETURN_URL || 'http://localhost:3000/api/payment/callback',
+  vnp_IpnUrl: process.env.VNPAY_IPN_URL || 'http://localhost:3000/api/payment/ipn',
 };
 
 /**
@@ -51,6 +52,7 @@ export function createPaymentUrl({
   vnp_Params['vnp_OrderType'] = 'other';
   vnp_Params['vnp_Amount'] = Math.round(amount * 100);
   vnp_Params['vnp_ReturnUrl'] = vnpayConfig.vnp_ReturnUrl;
+  vnp_Params['vnp_IpnUrl'] = vnpayConfig.vnp_IpnUrl;
   vnp_Params['vnp_IpAddr'] = ipAddr;
   vnp_Params['vnp_CreateDate'] = createDate;
 
